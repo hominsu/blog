@@ -1,0 +1,750 @@
+---
+title: '单周期 CPU 模型机的设计与实现'
+date: '2020-09-22'
+tags: ['verilog', 'cpu']
+draft: false
+summary: 'verilog 实现的单周期 CPU 模型机'
+authors: ['default']
+---
+
+## 摘要
+
+通过 quartus 软件, 使用 verilog 语言, 采用了结构化行为描述方法, 完成了单周期 CPU 模型机的设计和仿真, 实现了模型机的正常运行
+
+**关键字**: 整体、系统
+
+<TOCInline toc={props.toc} exclude="摘要" toHeading={3} asDisclosure />
+
+## 原理与模型机设计
+
+### 实验有关原理
+
+#### 冯诺依曼计算机工作原理
+
+1. 计算机由控制器、运算器、存储器、输入设备、输出设备五大部分组成。
+2. 程序和数据以二进制代码形式不加区别地存放在存储器中, 存放位置由地址确定。
+3. 控制器根据存放在存储器中地指令序列（程序）进行工作, 并由一个程序计数器控制指令地执行。
+
+- 单周期 CPU: 指的是一条指令的执行在一个时钟周期内完成, 然后开始下一条指令的执行, 即一条指令用一个时钟周期完成。
+
+- 指令系统: 指一台计算机的所有的指令合集。
+
+- 指令周期: 是从取指令、分析指令到执行完该指令所需的时间, 不同的指令其指令周期长短可以不同。
+
+- 单周期 CPU 处理指令的步骤:
+
+  取指令 -> 指令译码 -> 指令执行 -> 存储器访问 -> 结果写回
+
+### 模型机设计
+
+#### 结构框图
+
+![结构框图](/static/images/other/design-and-implementation-of-single-cycle-cpu/block_diagram.png)
+
+#### 控制线路图
+
+![控制线路图](/static/images/other/design-and-implementation-of-single-cycle-cpu/control_circuit_diagram.png)
+
+#### 对应模块及功能
+
+**InstructionMemory**: 指令存储器, 依据输入的地址从存储器中取出相对应的指令。
+
+![指令存储器](/static/images/other/design-and-implementation-of-single-cycle-cpu/instruction_memory.png)
+
+**CU**: 控制单元, 对指令进行分析, 确定应该进行什么操作, 并按照确定的时序向相应的部件发出控制信号。
+
+![控制单元](/static/images/other/design-and-implementation-of-single-cycle-cpu/control_unit.png)
+
+**Register**: 数据寄存器, 负责将 alu 的运算数据和存储器中取出和存入的数据进行暂存, 起到缓存的作用, 因为单周期内不能同时读写, 所以加入了一级缓存的设计。
+
+![数据寄存器](/static/images/other/design-and-implementation-of-single-cycle-cpu/data_register.png)
+
+**ALU**: 算术逻辑单元, 依据输入的操作码和数据进行相应的算数运算和逻辑运算。
+
+![算术逻辑单元](/static/images/other/design-and-implementation-of-single-cycle-cpu/alu.png)
+
+**memRam**: 数据存储器, 对数据进行存储
+
+![数据存储器](/static/images/other/design-and-implementation-of-single-cycle-cpu/data_memory.png)
+
+**PC**: 程序计数器, 进行取值操作, 完成第一条指令的执行, 而后根据 PC 取出第二条指令的地址。PC 中的地址自动加一或由转移指令给出下一条指令的地址。
+
+![程序计数器](/static/images/other/design-and-implementation-of-single-cycle-cpu/pc.png)
+
+## 原理与模型机设计
+
+### 操作码格式
+
+本次实验采用的是定长编码, 机器指令 16 位编码, 故根据实际需求设计出以下操作码:
+
+```verilog
+`define ADD 4'b0000 //算术加
+`define INC 4'b0001 //算术加1
+`define NOT 4'b0010 //逻辑非
+`define AND 4'b0011 //逻辑与
+`define OR 4'b0100 //逻辑或
+`define SLF 4'b0101 //数据左移
+`define SRF 4'b0110 //数据右位
+`define JMP 4'b0111 //无条件转移
+`define STO 4'b1000 //写存储器, 存数
+`define LAD 4'b1001 //读存储器, 取数
+`define MOV 4'b1010 //数据传送
+`define HAT 4'b1111 //暂停
+```
+
+### 指令与格式
+
+#### ==\>算数运算指令
+
+(1) ADD rd, rs, rt
+
+| 0000 | rd(四位) | rs(四位) | rt(四位) |
+| :--: | :------: | :------: | :------: |
+|      |          |          |          |
+
+> 功能: rd \<- rs + rt (算数加)
+
+(2) INC rt, rs
+
+| 0001 | rt(四位) | rs(四位) | 0000(未用) |
+| :--: | :------: | :------: | :------: |
+|      |          |          |          |
+
+> 功能: rt \<- rs (算数加1)
+
+#### ==\>逻辑运算指令
+
+(3) NOT rt, rs
+
+| 0010 | rt(四位) | rs(四位) | 0000(未用) |
+| :--: | :------: | :------: | :------: |
+|      |          |          |          |
+
+> 功能: rt \<- !rs (逻辑非运算)
+
+(4) AND rd, rs, rt
+
+| 0011 | rd(四位) | rs(四位) | rt(四位) |
+| :--: | :------: | :------: | :------: |
+|      |          |          |          |
+
+> 功能: rd \<-  rs & rt (逻辑与运算)
+
+(5) OR rd, rs, rt
+
+| 0100 | rd(四位) | rs(四位) | rt(四位) |
+| :--: | :------: | :------: | :------: |
+|      |          |          |          |
+
+> 功能: rd \<- rs \| rt (逻辑或运算)
+
+#### ==\>移位指令
+
+(6) SLF rd, rs, rt
+
+| 0101 | rd(四位) | rs(四位) | rt(四位) |
+| :--: | :------: | :------: | :------: |
+|      |          |          |          |
+
+> 功能: rd \<- rs\<\<rt (左移)
+
+(7) SRF rd, rt, rs
+
+| 0110 | rd(四位) | rs(四位) | rt(四位) |
+| :--: | :------: | :------: | :------: |
+|      |          |          |          |
+
+> 功能: rd \<- rs\>\>rt (右移)
+
+#### ==\>存储器读写指令
+
+(8) STO rt, rs
+
+| 1000 | rt(三位) | 0(未用) | rs(四位) | 0000(未用) |
+| :--: | :-----: | :-----: | :-----: | :-------: |
+|      |         |         |         |           |
+
+> 功能: 将数据从寄存器写入到数据存储器
+
+(9) LAD rt, rs
+
+| 1001 | rt(四位) | rs(三位) | 00000(未用) |
+| :--: | :------: | :------: | :------: |
+|      |          |          |          |
+
+> 功能: 将数据从数据存储器读出到寄存器
+
+#### ==\>无条件转移指令
+
+(10) JMP
+
+| 0111 | 0000(未用) | 转移指令地址(八位) |
+| :--: | :-------: | :--------------: |
+|      |           |                  |
+
+> 功能: 跳转到指定的指令地址
+
+#### ==\>停机指令
+
+(11) HLT
+
+| 1111 | 000000000000(未用) |
+| :--: | :---------------: |
+|      |                   |
+
+> 功能: 停机, PC的值保持不变
+
+## 模型机实现与测试
+
+### Verilog 程序设计
+
+#### **headfile.v**:
+
+```verilog
+`ifndef HEADFILE_H_
+
+`define ADD 4'b0000 //算术加
+`define INC 4'b0001 //算术加1
+`define NOT 4'b0010 //逻辑非
+`define AND 4'b0011 //逻辑与
+`define OR  4'b0100 //逻辑或
+`define SLF 4'b0101 //数据左移
+`define SRF 4'b0110 //数据右位
+`define JMP 4'b0111 //无条件转移
+`define STO 4'b1000 //写存储器, 存数
+`define LAD 4'b1001 //读存储器, 取数
+`define MOV 4'b1010 //数据传送
+`define HAT 4'b1111 //暂停
+
+`define rg0 4'b0000 //寄存器0
+`define rg1 4'b0001 //寄存器1
+`define rg2 4'b0010 //寄存器2
+
+`endif
+```
+
+#### **alu.v:**
+
+```verilog
+`timescale 1ns / 1ps
+`include "headfile.v"
+
+//ALU, 进行逻辑运算和算数运算
+module alu(op, a, b, n, f);
+    input [3:0] op, n;
+    input [7:0] a, b;
+    output [7:0] f;
+    reg [7:0] f;
+    
+    always@(*)
+    begin
+        case(op)
+            `ADD:   f = a + b;
+            `INC:   f = a + 1;
+            `NOT:   f = ~a;
+            `AND:   f = a&b;
+            `OR:    f = a|b;
+            `SLF:   f = a<<n;
+            `SRF:   f = a>>n;
+            default:    f = 8'b00000000;
+        endcase
+    end
+    
+endmodule
+```
+
+#### **memRam.v**:
+
+```verilog
+`timescale 1ns / 1ps
+`include "headfile.v"
+
+//存储器
+module memRam(data,wren,address,inclock,outclock,q);
+    
+    parameter wordsize = 8;
+    parameter memsize = 8;
+    parameter addr = 3; //3位地址线
+    
+    input [wordsize-1:0] data;
+    input [addr-1:0] address;
+    input wren,inclock,outclock;
+    output [wordsize-1:0] q;
+    reg [wordsize-1:0] q;
+    reg [wordsize-1:0] ram [memsize-1:0];
+    
+    integer i;
+    
+    initial 
+        begin//初始化
+            for(i=0; i<8; i=i+1)
+                ram[i]=8'b00000000;
+            ram[0]=8'b00000010; //在第0位写入2
+            
+        end
+    
+    always@(posedge inclock)    //inclock上升沿触发
+        begin
+            if(~wren)
+                ram[address] = data;    //wren为低电平时, 将data写入到对应地址
+        end
+    
+    always@(posedge outclock)   //outclock上升沿触发
+        begin
+            if(wren)
+                q = ram[address];   //wren为高电平时, 读出对应地址的数据
+        end
+        
+endmodule
+```
+
+#### **Register.v**:
+
+```verilog
+`timescale 1ns / 1ps
+`include "headfile.v"
+
+//寄存器
+module Register(clk,data,wren,inaddr,outaddr1,outaddr2,
+                    regtoalu1,regtoalu2,regtomemaddr,regtomem,
+                    memtoregwren,memtoregaddr,memtoregdata);
+    
+    input [7:0] data;
+    input [3:0] inaddr,outaddr1,outaddr2,regtomemaddr,memtoregaddr;
+    input wren,clk,memtoregwren;
+    output [7:0] regtoalu1,regtoalu2,regtomem,memtoregdata;
+    
+    reg [7:0] regmem [15:0];
+    
+    reg lwren,lmemtoregwren;
+    reg [3:0] linaddr,lmemtoregaddr;
+    reg [7:0] ldata,lmemtoregdata;
+    
+    integer i;
+    
+    initial 
+        begin//初始化
+            lwren = 1'b0;
+            lmemtoregwren = 1'b0;
+            for(i=0; i<16; i=i+1)
+                regmem[i]=8'b00000000;
+        end
+        
+    always@(posedge clk)    //缓存
+        begin
+            lwren <= wren;
+            linaddr <= inaddr;
+            ldata <= data;
+            
+            lmemtoregwren <= memtoregwren;
+            lmemtoregaddr <= memtoregaddr;
+            lmemtoregdata <= memtoregdata;
+        end
+    
+    always@(*)
+        begin
+            if(lwren)
+                regmem[linaddr] <= ldata;   //将data写入到对应地址
+            if(lmemtoregwren)
+                regmem[lmemtoregaddr] <= lmemtoregdata;
+        end
+        
+    assign regtoalu1 = regmem[outaddr1];    //从寄存器取值
+    assign regtoalu2 = regmem[outaddr2];
+    assign regtomem = regmem[regtomemaddr];
+        
+endmodule
+```
+
+#### **InstructionMemory.v**:
+
+```verilog
+`timescale 1ns / 1ps
+`include "headfile.v"
+
+//存储指令
+module InstructionMemory(A, RD);
+
+    input [7:0] A;
+    output [15:0] RD;
+    
+    reg [15:0] IM [29:0];
+    assign RD = IM[A];//立即根据地址取出内容
+    
+    //执行成功后, 存储器中从1到7位的数据应为: 2, 3, 5, 2, 3, 253, 250, 126
+    initial begin
+        IM[0] = {`LAD, `rg0, 3'b000, 5'b00000};     //从存储器第0位读取数据到寄存器rg0, rg0 = 2
+
+/*-----------------------------------------------------------------*/
+        IM[1] = {`INC, `rg1, `rg0, 4'b0000};            //将寄存器rg0的数据算术加1并将结果移到rg1，rg1 = rg0 + 1 = 2 + 1 = 3
+
+        IM[2] = {`STO, 3'b001, 1'b0, `rg1, 4'b0000};    //将寄存器rg1中的数据存入存储器第1位，3
+/*-----------------------------------------------------------------*/
+        IM[3] = {`ADD, `rg2, `rg1, `rg0}; //将寄存器rg0和rg1中的数相加并将结果存入rg2，rg2=rg0+rg1=2+3=5
+
+        IM[4] = {`STO, 3'b010, 1'b0, `rg2, 4'b0000};    //将寄存器rg2中的数据存入存储器第2位,5
+/*-----------------------------------------------------------------*/
+        IM[5] = {`JMP, 4'b0000, 8'b00000111};   //跳转到第七条指令
+        IM[6] = {`HAT, 12'b000000000000};   //若没有跳转成功，就会停机
+/*-----------------------------------------------------------------*/
+        IM[7] = {`AND, `rg2, `rg1, `rg0}; //将寄存器rg0和rg1中的数进行与运算并存入rg2，rg2 = rg1 & rg0 = 00000011 & 00000010 = 00000010（2）
+
+        IM[8] = {`STO, 3'b011, 1'b0, `rg2, 4'b0000};    //将寄存器rg2中的数据存入存储器第3位，2
+/*-----------------------------------------------------------------*/
+        IM[9] = {`OR, `rg2, `rg1, `rg0}; //将寄存器rg0和rg1中的数进行或运算并存入rg2，/rg2 = rg1 | rg0 = 00000011 | 00000010 = 00000011（3）
+
+        IM[10] = {`STO, 3'b100, 1'b0, `rg2, 4'b0000};   //将寄存器rg2中的数据存入存储器第4位，3
+/*-----------------------------------------------------------------*/
+        IM[11] = {`NOT, `rg2, `rg0, 4'b0000};           //将寄存器rg0的数据进行非运算并将结果存入rg2，rg2 = ~rg0 = ~00000010 = 11111101（253）
+
+        IM[12] = {`STO, 3'b101, 1'b0, `rg2, 4'b0000};   //将寄存器rg2中的数据存入存储器第5位，253
+/*-----------------------------------------------------------------*/
+        IM[13] = {`SLF, `rg0, `rg2, 4'b0001}; //rg2的数据左移一位并将结果存入rg0，rg0 = rg2<<1 = 11111101<<1 = 11111010（250）
+
+        IM[14] = {`STO, 3'b110, 1'b0, `rg0, 4'b0000};   //将寄存器rg0中的数据存入存储器第6位，250
+/*-----------------------------------------------------------------*/
+        IM[15] = {`SRF, `rg1, `rg2, 4'b0001}; //rg2的数据右移一位并将结果存入rg1，rg1 = rg2>>1 = 11111101>>1 = 01111110（126）
+
+        IM[16] = {`STO, 3'b111, 1'b0, `rg1, 4'b0000};   //将寄存器rg2中的数据存入存储器第7位，126
+/*-----------------------------------------------------------------*/
+        IM[17] = {`HAT, 12'b000000000000}; //停机
+        IM[18] = 16'b0000000000000000;
+        IM[19] = 16'b0000000000000000;
+        IM[20] = 16'b0000000000000000;
+        IM[21] = 16'b0000000000000000;
+        IM[22] = 16'b0000000000000000;
+        IM[23] = 16'b0000000000000000;
+        IM[24] = 16'b0000000000000000;
+        IM[25] = 16'b0000000000000000;
+        IM[26] = 16'b0000000000000000;
+        IM[27] = 16'b0000000000000000;
+        IM[28] = 16'b0000000000000000;
+        IM[29] = 16'b0000000000000000;
+    end
+
+endmodule
+
+```
+
+#### **CU.v**:
+
+```verilog
+`timescale 1ns / 1ps
+`include "headfile.v"
+
+//控制不同指令下对数据的分发
+
+module CU(
+    input [15:0] instr,
+    output enable,
+    output reg [3:0] regoutaddr1,
+    output reg [3:0] regoutaddr2,
+    output reg [3:0] reginaddr,
+    output reg [3:0] regtomemaddr,
+    output reg [3:0] memtoregaddr,
+    output reg [3:0] aluop,
+    output reg [3:0] alun,
+    output reg memwren,
+    output reg memtoregwren,
+    output reg [2:0] memaddr,
+    output reg [7:0] pcnextaddr,
+    output reg pcnext,
+    output reg pcflag,
+    output reg regwren);
+    
+wire [3:0] op;
+assign op = instr[15:12];
+
+initial
+    begin
+        regwren = 1'b0;
+        memtoregwren <= 1'b0;
+        memwren = 1'b1;
+        pcnext = 1'b0;
+        pcflag = 1'b0;
+    end
+
+always@(*)
+    begin
+        if((op == `ADD)||(op == `AND)||(op == `OR))
+            begin
+                aluop <= instr[15:12];
+                regoutaddr1 <= instr[3:0];
+                regoutaddr2 <= instr[7:4];
+                regwren <= 1'b1;
+                reginaddr <= instr[11:8];
+            end
+        else if((op == `SLF)||(op == `SRF))
+            begin
+                aluop <= instr[15:12];
+                alun <= instr[3:0];
+                regoutaddr1 <= instr[7:4];
+                regwren <= 1'b1;
+                reginaddr <= instr[11:8];
+            end
+        else if((op == `INC)||(op == `NOT))
+            begin
+                aluop <= instr[15:12];
+                regoutaddr1 <= instr[7:4];
+                regwren <= 1'b1;
+                reginaddr <= instr[11:8];
+            end
+        else if((op == `STO))
+            begin
+                    regtomemaddr <= instr[7:4];
+                        memaddr <= instr[11:9];
+                        memwren <= 1'b0;
+            end
+        else if((op == `LAD))
+            begin
+                memaddr <= instr[7:5];
+                memwren <= 1'b1;
+                memtoregaddr <= instr[11:8];
+                memtoregwren <= 1'b1;
+            end
+        else
+            begin
+                regwren <= 1'b0;
+                memtoregwren <= 1'b0;
+                //memwren <= 1'b1;
+            end
+    end
+    
+always@(*)
+    begin
+        if((op == `JMP))
+            begin
+                pcnextaddr <= instr[7:0];
+                pcnext <= 1'b1;
+                pcflag <= 1'b1;
+            end
+        else
+            pcnext <= 1'b0;
+    end
+
+    
+    assign enable = ~(op == `HAT);
+endmodule
+```
+
+#### **CPU_top.v**:
+
+```verilog
+`timescale 1ns / 1ps
+
+//顶层模块，用于连接各模块
+module CPU_top(
+    input clk,
+    input reset,
+    output [7:0] OPT_PC
+    );
+    
+    reg [7:0] PC;
+    wire [15:0] instr;
+    wire [7:0] aluout;
+    wire [3:0] alun;
+    wire [3:0] aluop;
+    wire regwren,enable,memwren,memtoregwren,pcnext,pcflag;
+    wire [2:0] memaddr;
+    wire [3:0] memtoregaddr;
+    wire [3:0] Reginaddr;
+    wire [3:0] Regoutaddr1;
+    wire [3:0] Regoutaddr2;
+    wire [3:0] regtomemaddr;
+    wire [7:0] Registerout1;
+    wire [7:0] Registerout2;
+    wire [7:0] memtoregdata;
+    wire [7:0] regtomem;
+    wire [7:0] NextPC;
+    wire [7:0] pcnextaddr;
+    
+    initial begin
+        PC = 8'b00000000;
+    end
+    
+    InstructionMemory IM(
+        .A(PC),
+        .RD(instr)
+    );
+    
+    CU m0(
+        .instr(instr),
+        .enable(enable),
+        .regoutaddr1(Regoutaddr1),
+        .regoutaddr2(Regoutaddr2),
+        .reginaddr(Reginaddr),
+        .regtomemaddr(regtomemaddr),
+        .memtoregaddr(memtoregaddr),
+        .aluop(aluop),
+        .alun(alun),
+        .memwren(memwren),
+        .memtoregwren(memtoregwren),
+        .memaddr(memaddr),
+        .pcnextaddr(pcnextaddr),
+        .pcnext(pcnext),
+        .pcflag(pcflag),
+        .regwren(regwren)
+   );
+    
+    Register R(
+        .clk(clk),
+        .data(aluout),
+        .wren(regwren),
+        .inaddr(Reginaddr),
+        .outaddr1(Regoutaddr1),
+        .outaddr2(Regoutaddr2),
+        .regtoalu1(Registerout1),
+        .regtoalu2(Registerout2),
+        .regtomemaddr(regtomemaddr),
+        .regtomem(regtomem),
+        .memtoregwren(memtoregwren),
+        .memtoregaddr(memtoregaddr),
+        .memtoregdata(memtoregdata)
+   );
+    
+    
+    alu A(
+        .op(aluop),
+        .a(Registerout1),
+        .b(Registerout2),
+        .n(alun),
+        .f(aluout)
+   );
+    
+    memRam M(
+        .data(regtomem),
+        .wren(memwren),
+        .address(memaddr),
+        .inclock(clk),
+        .outclock(clk),
+        .q(memtoregdata)
+   );
+    
+    
+    assign NextPC = (pcnext) ? pcnextaddr : (PC + 1'b1);    //判定是跳转到指定地址还是执行下一条指令
+    
+    always@(posedge clk)    //时序，每个周期PC值变化一次
+    begin
+        if(reset)
+            PC <= 0;
+        else
+            begin
+                if(enable)
+                    PC <= NextPC;
+                else
+                    PC <= PC; //停机指令，PC值保持不变
+            end
+    end
+
+    assign OPT_PC = PC;
+    
+endmodule
+```
+
+### 测试程序
+
+#### **CPU_test.v**:
+
+```verilog
+`timescale 1ns / 1ps
+
+module CPU_test(OPT_PC);
+    
+    output [7:0] OPT_PC;
+    reg clk;
+    reg reset;
+    
+    
+    CPU_top uut(
+        .clk(clk),
+        .reset(reset),
+        .OPT_PC(OPT_PC)
+    );
+    
+    
+    //执行成功后，存储器中从1到7位的数据应为: 2，3，5，2，3，253，250，126
+    initial begin
+        clk = 0;
+        reset = 1;  //初始化CPU
+        
+        #100;
+        
+        reset = 0;
+        
+        $display(" pc:     instr      :  ALUR  :rg0:rg1:rg2: m0: m1: m2: m3: m4: m5: m6: m7");
+        $monitor("%d:%b:%b:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d", 
+            uut.PC, uut.instr, uut.aluout, uut.R.regmem[0], uut.R.regmem[1], uut.R.regmem[2], 
+            uut.M.ram[0], uut.M.ram[1], uut.M.ram[2], uut.M.ram[3], 
+            uut.M.ram[4], uut.M.ram[5], uut.M.ram[6], uut.M.ram[7] );
+      
+        #2000 $stop;
+    end
+    
+    always #50 clk = ~clk;
+      
+endmodule
+```
+
+### 模型机执行程序的过程的分析
+
+#### 仿真得到的波形图
+
+![波形图](/static/images/other/design-and-implementation-of-single-cycle-cpu/waveform_graph.png)
+
+#### 控制台输出
+
+![控制台输出](/static/images/other/design-and-implementation-of-single-cycle-cpu/console_log.png)
+
+#### 指令的分析
+
+- 指令 0: 从存储器第 0 位读取数据到寄存器 rg0，rg0=2，存储器第 0 位为 2
+
+- 指令 1: 将寄存器 rg0 的数据算术加1并将结果移到 rg1，rg1 = rg0+1=2+1=3
+
+- 指令 2: 将寄存器 rg1 中的数据存入存储器第 1 位，存储器第1位为 3
+
+- 指令 3: 将寄存器 rg0 和 rg1 中的数相加并将结果存入 rg2，rg2=rg0+rg1=2+3=5
+
+- 指令 4: 将寄存器 rg2 中的数据存入存储器第 2 位, 存储器第 2 位为 5
+
+- 指令 5: 跳转到第七条指令
+
+- 指令 6: 若没有跳转成功，就会停机
+
+- 指令 7: 将寄存器 rg0 和 rg1 中的数进行与运算并存入 rg2，rg2=00000011&00000010=00000010
+
+- 指令 8: 将寄存器 rg2 中的数据存入存储器第3位，存储器第 3 位为 2
+
+- 指令 9: 将寄存器 rg0 和 rg1 中的数进行或运算并存入 rg2，rg2=
+  00000011\|00000010=00000011
+
+- 指令 10: 将寄存器 rg2 中的数据存入存储器第 4 位，存储器第 4 位为 3
+
+- 指令 11: 将寄存器 rg0 的数据进行非运算并将结果存入 rg2，rg2=\~00000010=11111101（253）
+
+- 指令 12: 将寄存器 rg2 中的数据存入存储器第 5 位，存储器第 5 位为 253
+
+- 指令 13: rg2 的数据左移一位并将结果存入 rg0，rg0=rg2\<\<1=11111101\<\<1=11111010（250）
+
+- 指令 14: 将寄存器 rg0 中的数据存入存储器第 6 位，存储器第 6 位为 250
+
+- 指令 15: rg2 的数据右移一位并将结果存入 rg1，rg1=rg2\>\>1=11111101\>\>1=01111110（126）
+
+- 指令 16: 将寄存器 rg2 中的数据存入存储器第 7 位，存储器第 7 位为 126
+
+- 指令 17: 停机
+
+#### 结果分析
+
+- 指令 0-2: 测试算数加一，计算 2+1=3，得到 3 存储在存储器第1位上
+- 指令 3-4: 测试加法，计算 2+3=5，得到 5 存储在存储器第2位上
+- 指令 5-6，测试跳转指令
+- 指令 7-8，测试与运算，计算 00000011 & 00000010，得到 3 存储在存储器第2位上
+- 指令 9-10，测试或运算，计算 00000011 \| 00000010，得到 4 存储在存储器第3位上
+- 指令 11-12，测试非运算，计算 \~00000010，得到 253 存储在存储器第5位上
+- 指令 13-14，测试左移，11111101\<\<1，得到 250 存储在存储器第6位上
+- 指令 15-16，测试右移，11111101\>\>1，得到 126 存储在存储器第7位上
+
+从波形图中可以看到从指令5跳转到指令 7，跳转指令成功运行，而指令 17 后每个周期PC的值都不变。
+
+从控制台的输出中可以看到存储器中的数值为: 2，3，5，2，3，253，250，126 和对指令的分析是一致的。

@@ -1,0 +1,225 @@
+---
+title: '二进制中 1 的个数 ——《C/C++ 位运算黑科技 03》'
+date: '2022-03-27'
+tags: ['cpp', 'bits', 'hacks']
+draft: false
+summary: '使用归并计数器计算二进制中 1 的个数'
+authors: ['default']
+---
+
+## 原理
+
+计算一个二进制数中 1 的出现次数其实很简单, 只需要不断用 `v & (v - 1)` 移除掉最后一个 1 即可, 原理可以参考这篇文章：[2 的幂次方 ——《C/C++ 位运算黑科技 02》](https://www.hauhau.cn/article/1ddd54b8.html)
+
+上述方法是一个普通的思考方向, 下面我会介绍另外一种思路：并行计数器, 来计算二进制数中出现的 1
+
+实际上, 我们可以将这个数看作是全部由单位的计数器组成, 1、0 就代表单个计数器的状态, 我们只要合并相邻的计数器即可, 这其实也是归并的思想。
+
+## 代码
+
+```cpp:count_bits.cc
+inline unsigned count_bits(uint64_t v) {
+    v = (v & 0x5555555555555555) + ((v >> 1) & 0x5555555555555555);
+    v = (v & 0x3333333333333333) + ((v >> 2) & 0x3333333333333333);
+    v = (v & 0x0f0f0f0f0f0f0f0f) + ((v >> 4) & 0x0f0f0f0f0f0f0f0f);
+    v = (v & 0x00ff00ff00ff00ff) + ((v >> 8) & 0x00ff00ff00ff00ff);
+    v = (v & 0x0000ffff0000ffff) + ((v >> 16) & 0x0000ffff0000ffff);
+    v = (v & 0x00000000ffffffff) + ((v >> 32) & 0x00000000ffffffff);
+    return v;
+}
+
+inline unsigned count_bits(uint32_t v) {
+    v = (v & 0x55555555) + ((v >> 1) & 0x55555555);
+    v = (v & 0x33333333) + ((v >> 2) & 0x33333333);
+    v = (v & 0x0f0f0f0f) + ((v >> 4) & 0x0f0f0f0f);
+    v = (v & 0x00ff00ff) + ((v >> 8) & 0x00ff00ff);
+    v = (v & 0x0000ffff) + ((v >> 16) & 0x0000ffff);
+    return v;
+}
+
+inline unsigned count_bits(uint16_t v) {
+    v = (v & 0x5555) + ((v >> 1) & 0x5555);
+    v = (v & 0x3333) + ((v >> 2) & 0x3333);
+    v = (v & 0x0f0f) + ((v >> 4) & 0x0f0f);
+    v = (v & 0x00ff) + ((v >> 8) & 0x00ff);
+    return v;
+}
+
+inline unsigned count_bits(uint8_t v) {
+    v = (v & 0x55) + ((v >> 1) & 0x55);
+    v = (v & 0x33) + ((v >> 2) & 0x33);
+    v = (v & 0x0f) + ((v >> 4) & 0x0f);
+    return v;
+}
+```
+
+## 原理剖析
+
+下面以 `1110001010011110` 作为例子, 来解释并行计数器合并的方法：
+
+|   val    |  1   |  1   |  1   |  0   |  0   |  0   |  1   |  0   |  1   |  0   |  0   |  1   |  1   |  1   |  1   |  0   |
+| :------: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: |
+| & 0x5555 |  0   |  1   |  0   |  1   |  0   |  1   |  0   |  1   |  0   |  1   |  0   |  1   |  0   |  1   |  0   |  1   |
+|    =     |  0   |  1   |  0   |  0   |  0   |  0   |  0   |  0   |  0   |  0   |  0   |  1   |  0   |  1   |  0   |  0   |
+
+| val >> 1 |  0   |  1   |  1   |  1   |  0   |  0   |  0   |  1   |  0   |  1   |  0   |  0   |  1   |  1   |  1   |  1   |
+| :------: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: |
+| & 0x5555 |  0   |  1   |  0   |  1   |  0   |  1   |  0   |  1   |  0   |  1   |  0   |  1   |  0   |  1   |  0   |  1   |
+|    =     |  0   |  1   |  0   |  1   |  0   |  0   |  0   |  1   |  0   |  1   |  0   |  0   |  0   |  1   |  0   |  1   |
+
+然后两者相加就得到了相邻 2 个计数器的合并计数：1001000101011001, 然后我们在以 2 个比特为单位来继续合并计数器
+
+|   Val    |  10  |  01  |  00  |  01  |  01  |  01  |  10  |  01  |
+| :------: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: |
+| & 0x3333 |  00  |  11  |  00  |  11  |  00  |  11  |  00  |  11  |
+|    =     |  00  |  01  |  00  |  01  |  00  |  01  |  00  |  01  |
+
+| Val >> 2 |  00  |  10  |  01  |  00  |  01  |  01  |  01  |  10  |
+| :------: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: |
+| & 0x3333 |  00  |  11  |  00  |  11  |  00  |  11  |  00  |  11  |
+|    =     |  00  |  10  |  00  |  00  |  00  |  01  |  00  |  10  |
+
+然后两者相加就得到了相邻 4 个计数器的合并计数：0011000100100011, 然后我们在以 4 个比特为单位来继续合并计数器
+
+|   Val    | 0011 | 0001 | 0010 | 0011 |
+| :------: | :--: | :--: | :--: | :--: |
+| & 0x0f0f | 0000 | 1111 | 0000 | 1111 |
+|    =     | 0000 | 0001 | 0000 | 0011 |
+
+| Val >> 4 | 0000 | 0011 | 0001 | 0010 |
+| :------: | :--: | :--: | :--: | :--: |
+| & 0x0f0f | 0000 | 1111 | 0000 | 1111 |
+|    =     | 0000 | 0011 | 0000 | 0010 |
+
+然后两者相加就得到了相邻 8 个计数器的合并计数：0000010000000101, 然后我们在以 8 个比特为单位来继续合并计数器
+
+|  Val  | 00000100 | 00000101 |
+| :---: | :------: | :------: |
+| &00ff | 00000000 | 11111111 |
+|   =   | 00000000 | 00000101 |
+
+| Val >> 8 | 00000000 | 00000100 |
+| :------: | :------: | :------: |
+|  &00ff   | 00000000 | 11111111 |
+|    =     | 00000000 | 00000100 |
+
+然后两者相加就得到了相邻 8 个计数器的合并计数：0000000000001001, 转换成十进制就是 9, 与原数字中的 1 的个数是相同的。
+
+## Benchmark
+
+```cpp {3-11, 13-20, 22-28, 30-35} showLineNumbers
+#include "benchmark/benchmark.h"
+
+inline unsigned count_bits(uint64_t v) {
+  v = (v & 0x5555555555555555) + ((v >> 1) & 0x5555555555555555);
+  v = (v & 0x3333333333333333) + ((v >> 2) & 0x3333333333333333);
+  v = (v & 0x0f0f0f0f0f0f0f0f) + ((v >> 4) & 0x0f0f0f0f0f0f0f0f);
+  v = (v & 0x00ff00ff00ff00ff) + ((v >> 8) & 0x00ff00ff00ff00ff);
+  v = (v & 0x0000ffff0000ffff) + ((v >> 16) & 0x0000ffff0000ffff);
+  v = (v & 0x00000000ffffffff) + ((v >> 32) & 0x00000000ffffffff);
+  return v;
+}
+
+inline unsigned count_bits(uint32_t v) {
+  v = (v & 0x55555555) + ((v >> 1) & 0x55555555);
+  v = (v & 0x33333333) + ((v >> 2) & 0x33333333);
+  v = (v & 0x0f0f0f0f) + ((v >> 4) & 0x0f0f0f0f);
+  v = (v & 0x00ff00ff) + ((v >> 8) & 0x00ff00ff);
+  v = (v & 0x0000ffff) + ((v >> 16) & 0x0000ffff);
+  return v;
+}
+
+inline unsigned count_bits(uint16_t v) {
+  v = (v & 0x5555) + ((v >> 1) & 0x5555);
+  v = (v & 0x3333) + ((v >> 2) & 0x3333);
+  v = (v & 0x0f0f) + ((v >> 4) & 0x0f0f);
+  v = (v & 0x00ff) + ((v >> 8) & 0x00ff);
+  return v;
+}
+
+inline unsigned count_bits(uint8_t v) {
+  v = (v & 0x55) + ((v >> 1) & 0x55);
+  v = (v & 0x33) + ((v >> 2) & 0x33);
+  v = (v & 0x0f) + ((v >> 4) & 0x0f);
+  return v;
+}
+
+static void BM_count_64(benchmark::State &state) {
+  for (auto _: state) {
+    uint64_t n = UINT64_MAX;
+    benchmark::DoNotOptimize(count_bits(n));
+  }
+}
+
+static void BM_count_32(benchmark::State &state) {
+  for (auto _: state) {
+    uint32_t n = UINT32_MAX;
+    benchmark::DoNotOptimize(count_bits(n));
+  }
+}
+
+static void BM_count_16(benchmark::State &state) {
+  for (auto _: state) {
+    uint16_t n = UINT16_MAX;
+    benchmark::DoNotOptimize(count_bits(n));
+  }
+}
+
+static void BM_count_8(benchmark::State &state) {
+  for (auto _: state) {
+    uint8_t n = UINT8_MAX;
+    benchmark::DoNotOptimize(count_bits(n));
+  }
+}
+
+BENCHMARK(BM_count_8);
+BENCHMARK(BM_count_16);
+BENCHMARK(BM_count_32);
+BENCHMARK(BM_count_64);
+
+BENCHMARK_MAIN();
+```
+
+下面是使用 MacBook Air (M1, 2020) 和 Apple clang 13.1.6 得到的结果
+
+```cpp
+/Users/hominsu/CLionProjects/bit-hacks-bench/cmake-build-release-appleclang/bench/count_bits
+Unable to determine clock rate from sysctl: hw.cpufrequency: No such file or directory
+2022-03-27T14:09:30+08:00
+Running /Users/hominsu/CLionProjects/bit-hacks-bench/cmake-build-release-appleclang/bench/count_bits
+Run on (8 X 24.1205 MHz CPU s)
+CPU Caches:
+  L1 Data 64 KiB (x8)
+  L1 Instruction 128 KiB (x8)
+  L2 Unified 4096 KiB (x2)
+Load Average: 2.64, 2.22, 1.79
+------------------------------------------------------
+Benchmark            Time             CPU   Iterations
+------------------------------------------------------
+BM_count_8       0.319 ns        0.319 ns   1000000000
+BM_count_16      0.321 ns        0.321 ns   1000000000
+BM_count_32      0.313 ns        0.313 ns   1000000000
+BM_count_64      0.316 ns        0.316 ns   1000000000
+```
+
+下面是使用 i5-9500 和 gcc 8.5.0 (Red Hat 8.5.0-10) 在 CentOS-8-Stream 下得到的结果
+
+```cpp
+/tmp/tmp.CtmwmpTLjC/cmake-build-release-1104/bench/count_bits
+2022-03-27T14:10:07+08:00
+Running /tmp/tmp.CtmwmpTLjC/cmake-build-release-1104/bench/count_bits
+Run on (6 X 4100.35 MHz CPU s)
+CPU Caches:
+  L1 Data 32 KiB (x6)
+  L1 Instruction 32 KiB (x6)
+  L2 Unified 256 KiB (x6)
+  L3 Unified 9216 KiB (x1)
+Load Average: 0.57, 0.54, 0.51
+------------------------------------------------------
+Benchmark            Time             CPU   Iterations
+------------------------------------------------------
+BM_count_8       0.244 ns        0.244 ns   1000000000
+BM_count_16      0.246 ns        0.246 ns   1000000000
+BM_count_32      0.245 ns        0.244 ns   1000000000
+BM_count_64      0.249 ns        0.248 ns   1000000000
+```

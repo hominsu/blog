@@ -1,0 +1,301 @@
+---
+title: '可信软件设计实验环境搭建'
+date: '2021-12-23'
+tags: ['TSS', 'TPM-1.2', 'tpm-emulator', 'trousers']
+draft: false
+summary: '一步到位, 帮你踩好可信软件设计实验的坑'
+authors: ['default']
+---
+
+非常坑，之前尝试过使用 yum 直接安装 trousers，会出现 TPM_E_NOAUTH 的问题，现在使用 trousers-0.3.15 进行编译后能够正常进行实验，目前还不清楚是什么包的问题导致的。
+
+<TOCInline toc={props.toc} exclude="摘要" toHeading={2} asDisclosure />
+
+## 基础环境准备
+
+实验环境基于 CentOS7，确保你的系统是全新的，否则会有不清楚地包依赖或冲突问题
+
+- 更新
+
+  ```bash
+  yum update -y
+  ```
+
+- 安装基础开发组相关包
+
+  ```bash
+  yum groupinstall "Development Tools"
+  ```
+
+- 安装依赖的软件包
+
+  ```bash
+  yum install -y automake autoconf pkgconfig libtool gtk2-devel openssl-devel glibc-devel gmp-devel cmake psmisc
+  ```
+
+- 先上传 tc.tgz ，然后解压，进入 tc 目录中
+
+  ```bash
+  [root@localhost ~]# ls
+  anaconda-ks.cfg  tc.tgz
+  [root@localhost ~]# tar -xzf tc.tgz 
+  [root@localhost ~]# ls
+  anaconda-ks.cfg  tc  tc.tgz
+  [root@localhost ~]# cd tc
+  [root@localhost tc]# ls
+  tpm-emulator  trousers-0.3.15  trusted-computing-projectv0.3
+  ```
+
+## 编译 tpm-emulator
+
+- tpm-emulator 的目录结构如下：
+
+  ```bash
+  [root@localhost tc]# cd tpm-emulator/
+  [root@localhost tpm-emulator]# ls
+  AUTHORS  build.bat  build.sh  ChangeLog  CMakeLists.txt  config.h.in  crypto  mtm  README  tddl  tpm  tpmd  tpmd_dev
+  ```
+
+- 新建 build 并进入目录中，然后 CMake 生成 Makefile
+
+  ```bash
+  [root@localhost tpm-emulator]# cd build
+  [root@localhost build]# ls
+  [root@localhost build]# cmake ..
+  -- The C compiler identification is GNU 4.8.5
+  -- Check for working C compiler: /usr/bin/cc
+  -- Check for working C compiler: /usr/bin/cc -- works
+  -- Detecting C compiler ABI info
+  -- Detecting C compiler ABI info - done
+  -- Configuring done
+  -- Generating done
+  -- Build files have been written to: /root/tc/tpm-emulator/build
+  ```
+
+- 编译安装 tpm-emulator
+
+  ```bash
+  [root@localhost build]# make -j
+  [root@localhost build]# make install
+  [ 58%] Built target tpm
+  [ 80%] Built target mtm
+  [ 90%] Built target tpm_crypto
+  [ 92%] Built target tddl
+  [ 94%] Built target tddl_static
+  [ 96%] Built target test_tddl
+  [ 98%] Built target tpmd_dev
+  [100%] Built target tpmd
+  Install the project...
+  -- Install configuration: ""
+  -- Installing: /usr/local/lib/libtddl.so.1.2.0.7
+  -- Installing: /usr/local/lib/libtddl.so.1.2
+  -- Installing: /usr/local/lib/libtddl.so
+  -- Installing: /usr/local/lib/libtddl.a
+  -- Installing: /usr/local/include/tddl.h
+  Can't read private key
+  -- Installing: /usr/local/bin/tpmd
+  -- Removed runtime path from "/usr/local/bin/tpmd"
+  
+  [root@localhost build]# modprobe tpmd_dev
+  ```
+
+- 启动 tpm-emulator
+
+  ```bash
+  [root@localhost build]# tpmd -f
+  tpmd.c:390: Info: starting TPM Emulator daemon (1.2.0.7-475)
+  tpmd.c:93: Info: parsing options
+  tpmd.c:164: Info: no startup mode was specified; asuming 'clear'
+  tpmd.c:198: Info: installing signal handlers
+  tpmd.c:295: Info: staring main loop
+  tpmd.c:265: Info: initializing socket /var/run/tpm/tpmd_socket:0
+  tpm_emulator_extern.c:101: Info: _tpm_extern_init()
+  tpm_data.c:120: Info: initializing TPM data to default values
+  tpm_startup.c:29: Info: TPM_Init()
+  tpm_testing.c:243: Info: TPM_SelfTestFull()
+  tpm_testing.c:261: Info: Self-Test succeeded
+  tpm_startup.c:43: Info: TPM_Startup(1)
+  ```
+
+  
+
+## 编译 trousers
+
+- 新建一个终端，进入 trousers 目录，通过 `bootstrap` 生成 `configure`
+
+  ```bash
+  [root@localhost trousers-0.3.15]# sh bootstrap.sh 
+  + aclocal
+  + libtoolize --force -c
+  libtoolize: putting auxiliary files in `.'.
+  libtoolize: copying file `./ltmain.sh'
+  libtoolize: Consider adding `AC_CONFIG_MACRO_DIR([m4])' to configure.ac and
+  libtoolize: rerunning libtoolize, to keep the correct libtool macros in-tree.
+  libtoolize: Consider adding `-I m4' to ACLOCAL_AMFLAGS in Makefile.am.
+  + automake --add-missing -c --foreign
+  + autoconf
+  ```
+
+- 通过 `configure` 生成 Makefile
+
+  ```bash
+  [root@localhost trousers-0.3.15]# ./configure
+  ```
+
+- 编译安装 trousers
+
+  ```bash
+  [root@localhost trousers-0.3.15]# make -j
+  [root@localhost trousers-0.3.15]# make install
+  ```
+
+- 确认是否安装成功，检查是否存在：`/usr/local/var/lib/tpm/` 目录
+
+  ```bash
+  [root@localhost trousers-0.3.15]# ls /usr/local/var/lib/tpm/
+  ```
+
+- 启动 trousers
+
+  ```bash
+  [root@localhost trousers-0.3.15]# tcsd -e -f
+  TCSD TDDL ioctl: (25) Inappropriate ioctl for device
+  TCSD TDDL Falling back to Read/Write device support.
+  TCSD trousers 0.3.15: TCSD up and running.
+  ```
+
+  同时，上一个终端中 tpm-emulator 应有输出，如下所示：
+
+  ```bash
+  tpm_startup.c:43: Info: TPM_Startup(1)
+  tpm_capability.c:697: Info: TPM_GetCapability()
+  tpm_cmd_handler.c:4084: Info: TPM command succeeded
+  tpm_capability.c:697: Info: TPM_GetCapability()
+  tpm_cmd_handler.c:4084: Info: TPM command succeeded
+  tpm_capability.c:697: Info: TPM_GetCapability()
+  tpm_cmd_handler.c:4084: Info: TPM command succeeded
+  tpm_capability.c:697: Info: TPM_GetCapability()
+  tpm_cmd_handler.c:4084: Info: TPM command succeeded
+  tpm_capability.c:697: Info: TPM_GetCapability()
+  tpm_cmd_handler.c:4084: Info: TPM command succeeded
+  tpm_capability.c:697: Info: TPM_GetCapability()
+  tpm_cmd_handler.c:4084: Info: TPM command succeeded
+  tpm_capability.c:697: Info: TPM_GetCapability()
+  tpm_cmd_handler.c:4084: Info: TPM command succeeded
+  tpm_capability.c:697: Info: TPM_GetCapability()
+  tpm_cmd_handler.c:4084: Info: TPM command succeeded
+  tpm_capability.c:697: Info: TPM_GetCapability()
+  tpm_cmd_handler.c:4084: Info: TPM command succeeded
+  ```
+
+  
+
+## 验证安装环境
+
+- 新开一个终端，进入 trusted-computing-projectv0.3 目录中，make clean 清除之前的构建，然后编译。有警告是正常的，不是错误就行。
+
+  ```bash
+  [root@localhost trusted-computing-projectv0.3]# make clean
+  [root@localhost trusted-computing-projectv0.3]# make
+  ```
+
+- 到 init 中，take ownship 和创建 mig_key
+
+  ```bash
+  [root@localhost trusted-computing-projectv0.3]# cd init/
+  [root@localhost init]# ls
+  create_mig_key  create_mig_key.c  Makefile  Tspi_TPM_TakeOwnership01  Tspi_TPM_TakeOwnership01.c
+  [root@localhost init]# ./Tspi_TPM_TakeOwnership01 -v 1.2
+  
+  <<<test_start>>>
+  Testing Tspi_TPM_TakeOwnership01
+  TESTSUITE_OWNER_SECRET:(null)
+  TESTSUITE_SRK_SECRET:(null)
+          1 PASS  :  Tspi_TPM_TakeOwnership01  returned (0) TSS_SUCCESS
+  Cleaning up Tspi_TPM_TakeOwnership01
+  <<<end_test>>>
+  [root@localhost init]# ./create_mig_key -v 1.2
+  Please input Migratable key's migration secret
+  Enter PIN:
+  Verifying - Verify PIN:
+  success
+  ```
+
+- 到 SealUnseal 目录中，测试 seal 和 unseal，能 unseal 出来能通过说明环境没问题
+
+  ```bash
+  [root@localhost init]# cd ../SealUnseal/
+  [root@localhost SealUnseal]# ls
+  extend  extend.c  hex-out.h  Makefile  seal  seal.c  sealedData  seal_file  seal_file.c  test  test.c  unseal  unseal.c
+  [root@localhost SealUnseal]# ./seal -v 1.2
+  1
+  2
+  3
+  4
+  5
+  6
+  7
+  EncDataBlob:
+  00000000|  01 01 00 00 00 00 00 2c  00 02 00 80 c6 58 2c 81  .......,.....X,.
+  00000010|  00 7f 85 4e d3 87 3c 59  63 7a 01 8a 44 19 63 97  ...N..<Ycz..D.c.
+  00000020|  c6 58 2c 81 00 7f 85 4e  d3 87 3c 59 63 7a 01 8a  .X,....N..<Ycz..
+  00000030|  44 19 63 97 00 00 01 00  5d ee a6 34 cd e3 b2 e8  D.c.....]..4....
+  00000040|  a1 be ed 5f a6 20 67 86  17 ee fb 7c 40 2e 63 9a  ..._. g....|@.c.
+  00000050|  76 12 6b d3 2e e6 7c bb  2f 77 3d af 07 c8 19 36  v.k...|./w=....6
+  00000060|  d5 ef c6 74 5d 8e f0 8a  98 f2 5e 8c 22 f8 70 02  ...t].....^.".p.
+  00000070|  4c ca a3 4a 54 cd bf 39  1a 92 a9 2c c7 2b 96 28  L..JT..9...,.+.(
+  00000080|  de 6e 7a f9 b3 36 62 e0  f5 c3 42 4b 74 0c 6d 6d  .nz..6b...BKt.mm
+  00000090|  4f 65 33 1f 99 56 8e 5b  76 97 56 6e 68 17 f9 c1  Oe3..V.[v.Vnh...
+  000000a0|  0b 6a 81 7e dc 10 58 ed  8a 9a 03 5e e7 28 dc 87  .j.~..X....^.(..
+  000000b0|  c7 ba d3 95 d1 26 2c fe  8b 71 73 5b 27 23 5c b7  .....&,..qs['#\.
+  000000c0|  8b c9 1e f1 b8 52 ac 2b  b9 a3 08 2c f8 c5 e4 95  .....R.+...,....
+  000000d0|  ba f2 20 ee 49 ee a7 6a  34 8d a1 b9 a9 e7 25 d8  .. .I..j4.....%.
+  000000e0|  28 14 58 d8 ab 47 4e dd  0a 8a 25 a4 b4 b7 69 f8  (.X..GN...%...i.
+  000000f0|  85 70 4c 7d af 10 12 56  42 2a e3 1d be 05 8f ff  .pL}...VB*......
+  00000100|  41 7c 2b 53 0c d6 f5 0f  61 6a c8 65 33 5b 02 3e  A|+S....aj.e3[.>
+  00000110|  d4 b0 30 7d 03 b0 b4 0a  09 12 18 ad 10 73 bd 83  ..0}.........s..
+  00000120|  9f 2d 5e 46 57 37 1c 00  29 16 4b 44 68 e4 f2 95  .-^FW7..).KDh...
+  00000130|  9b 53 fe 0b 32 f1 48 78                           .S..2.Hx
+  
+  Success
+  [root@localhost SealUnseal]# ./unseal -v 1.2
+  Sealed data:
+  00000000|  01 01 00 00 00 00 00 2c  00 02 00 80 c6 58 2c 81  .......,.....X,.
+  00000010|  00 7f 85 4e d3 87 3c 59  63 7a 01 8a 44 19 63 97  ...N..<Ycz..D.c.
+  00000020|  c6 58 2c 81 00 7f 85 4e  d3 87 3c 59 63 7a 01 8a  .X,....N..<Ycz..
+  00000030|  44 19 63 97 00 00 01 00  5d ee a6 34 cd e3 b2 e8  D.c.....]..4....
+  00000040|  a1 be ed 5f a6 20 67 86  17 ee fb 7c 40 2e 63 9a  ..._. g....|@.c.
+  00000050|  76 12 6b d3 2e e6 7c bb  2f 77 3d af 07 c8 19 36  v.k...|./w=....6
+  00000060|  d5 ef c6 74 5d 8e f0 8a  98 f2 5e 8c 22 f8 70 02  ...t].....^.".p.
+  00000070|  4c ca a3 4a 54 cd bf 39  1a 92 a9 2c c7 2b 96 28  L..JT..9...,.+.(
+  00000080|  de 6e 7a f9 b3 36 62 e0  f5 c3 42 4b 74 0c 6d 6d  .nz..6b...BKt.mm
+  00000090|  4f 65 33 1f 99 56 8e 5b  76 97 56 6e 68 17 f9 c1  Oe3..V.[v.Vnh...
+  000000a0|  0b 6a 81 7e dc 10 58 ed  8a 9a 03 5e e7 28 dc 87  .j.~..X....^.(..
+  000000b0|  c7 ba d3 95 d1 26 2c fe  8b 71 73 5b 27 23 5c b7  .....&,..qs['#\.
+  000000c0|  8b c9 1e f1 b8 52 ac 2b  b9 a3 08 2c f8 c5 e4 95  .....R.+...,....
+  000000d0|  ba f2 20 ee 49 ee a7 6a  34 8d a1 b9 a9 e7 25 d8  .. .I..j4.....%.
+  000000e0|  28 14 58 d8 ab 47 4e dd  0a 8a 25 a4 b4 b7 69 f8  (.X..GN...%...i.
+  000000f0|  85 70 4c 7d af 10 12 56  42 2a e3 1d be 05 8f ff  .pL}...VB*......
+  00000100|  41 7c 2b 53 0c d6 f5 0f  61 6a c8 65 33 5b 02 3e  A|+S....aj.e3[.>
+  00000110|  d4 b0 30 7d 03 b0 b4 0a  09 12 18 ad 10 73 bd 83  ..0}.........s..
+  00000120|  9f 2d 5e 46 57 37 1c 00  29 16 4b 44 68 e4 f2 95  .-^FW7..).KDh...
+  00000130|  9b 53 fe 0b 32 f1 48 78                           .S..2.Hx
+  Unsealed Data:
+  00000000|  30 31 32 33 34 35 36 37  38 39 41 42 43 44 45 46  0123456789ABCDEF
+  00000010|  30 31 32 33 34 35 36 37  38 39 41 42 43 44 45 46  0123456789ABCDEF
+  
+  Success
+  ```
+
+  
+
+## 其他
+
+关于 tpmd 和 tcsd 出现的一堆问题，一般是 tpmd 没有清理干净，这样做一般能解决：
+
+```bash
+[root@localhost build]# tpmd deactivated
+[root@localhost build]# killall tpmd
+[root@localhost build]# tpmd clear
+[root@localhost build]# tpmd deactivated
+```

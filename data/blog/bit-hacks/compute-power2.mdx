@@ -1,0 +1,241 @@
+---
+title: '2 的幂次方 ——《C/C++ 位运算黑科技 02》'
+date: '2022-03-26'
+tags: ['cpp', 'bits', 'hacks']
+draft: false
+summary: '使用位运算计算整数的 2 的幂次'
+authors: ['default']
+---
+
+## 原理
+
+现在我们使用的二进制码表示都很简单：1、2、4、8、16 ······
+
+仔细观察就可以发现：在一串二进制数中, 如果只出现一个 1, 它就是 2 的幂次方
+
+## 代码
+
+```cpp:power2_1.cc
+template<typename T, class = std::enable_if_t<std::is_integral_v<T>>>
+inline bool power2_1(T v) {
+  return v && !(v & (v - 1));
+}
+```
+
+或者
+
+```cpp:power2_2.cc
+template<typename T, class = std::enable_if_t<std::is_integral_v<T>>>
+inline bool power2_2(T v) {
+  return v && ((v & -v) == v);
+}
+```
+
+## 原理剖析
+
+### 方法一
+
+因为 2 的幂次方只有一个 1, 我们只需要去掉最后一个 1 后判断是否等于 0 即可。
+
+```cpp
+v & (v - 1);
+```
+
+上面的代码就能够去掉最低位的 1, 原理也很简单：减 1 会使最低位 1 变为 0, 并在更低位产生 1, 其他位不变。而与上自身之后, 这些 1 和 之前的最低位 1 就会被清除掉。
+
+但是 0 是一个特例, 因此我们要把它排除掉：
+
+```cpp
+v && !(v & (v - 1));
+```
+
+### 方法二
+
+法二和法一类似, 首先我们需要知道 `v & -v` 有什么用, `v & -v` 其实就是获取一个二进制数的从低位到高位的第一个 1 的位索引。以 111 为例, 111 的补码为 001, 111 & 001 = 001；以 110 为例, 110 的补码为 010, 110 & 010 = 010；
+
+显而易见, 如果一个数的位索引等于它本身, 那么它就是 2 的幂次方。
+
+## Benchmark
+
+```cpp {3-6, 8-11} showLineNumbers
+#include "benchmark/benchmark.h"
+
+template<typename T, class = std::enable_if_t<std::is_integral_v<T>>>
+inline bool power2_1(T v) {
+  return v && !(v & (v - 1));
+}
+
+template<typename T, class = std::enable_if_t<std::is_integral_v<T>>>
+inline bool power2_2(T v) {
+  return v && ((v & -v) == v);
+}
+
+static void BM_power2_1(benchmark::State &state) {
+  for (auto _: state) {
+    benchmark::DoNotOptimize(power2_1(state.range(0)));
+  }
+}
+
+static void BM_power2_2(benchmark::State &state) {
+  for (auto _: state) {
+    benchmark::DoNotOptimize(power2_2(state.range(0)));
+  }
+}
+
+BENCHMARK(BM_power2_1)->RangeMultiplier(32)->Range(INT64_MIN, INT64_MAX);
+BENCHMARK(BM_power2_2)->RangeMultiplier(32)->Range(INT64_MIN, INT64_MAX);
+
+BENCHMARK_MAIN();
+```
+
+下面是使用 MacBook Air (M1, 2020) 和 Apple clang 13.1.6 得到的结果
+
+```cpp
+/Users/hominsu/CLionProjects/bit-hacks-bench/cmake-build-release-appleclang/bench/power2
+Unable to determine clock rate from sysctl: hw.cpufrequency: No such file or directory
+2022-03-26T13:24:41+08:00
+Running /Users/hominsu/CLionProjects/bit-hacks-bench/cmake-build-release-appleclang/bench/power2
+Run on (8 X 24.0935 MHz CPU s)
+CPU Caches:
+  L1 Data 64 KiB (x8)
+  L1 Instruction 128 KiB (x8)
+  L2 Unified 4096 KiB (x2)
+Load Average: 1.38, 1.45, 1.71
+---------------------------------------------------------------------------
+Benchmark                                 Time             CPU   Iterations
+---------------------------------------------------------------------------
+BM_power2_1/-9223372036854775808      0.443 ns        0.443 ns   1000000000
+BM_power2_1/-1152921504606846976      0.443 ns        0.443 ns   1000000000
+BM_power2_1/-36028797018963968        0.443 ns        0.443 ns   1000000000
+BM_power2_1/-1125899906842624         0.443 ns        0.443 ns   1000000000
+BM_power2_1/-35184372088832           0.443 ns        0.443 ns   1000000000
+BM_power2_1/-1099511627776            0.444 ns        0.444 ns   1000000000
+BM_power2_1/-34359738368              0.443 ns        0.443 ns   1000000000
+BM_power2_1/-1073741824               0.444 ns        0.444 ns   1000000000
+BM_power2_1/-33554432                 0.444 ns        0.444 ns   1000000000
+BM_power2_1/-1048576                  0.444 ns        0.444 ns   1000000000
+BM_power2_1/-32768                    0.443 ns        0.443 ns   1000000000
+BM_power2_1/-1024                     0.443 ns        0.443 ns   1000000000
+BM_power2_1/-32                       0.444 ns        0.444 ns   1000000000
+BM_power2_1/-1                        0.444 ns        0.444 ns   1000000000
+BM_power2_1/0                         0.314 ns        0.314 ns   1000000000
+BM_power2_1/1                         0.444 ns        0.443 ns   1000000000
+BM_power2_1/32                        0.444 ns        0.444 ns   1000000000
+BM_power2_1/1024                      0.443 ns        0.443 ns   1000000000
+BM_power2_1/32768                     0.443 ns        0.443 ns   1000000000
+BM_power2_1/1048576                   0.443 ns        0.443 ns   1000000000
+BM_power2_1/33554432                  0.446 ns        0.446 ns   1000000000
+BM_power2_1/1073741824                0.443 ns        0.443 ns   1000000000
+BM_power2_1/34359738368               0.443 ns        0.443 ns   1000000000
+BM_power2_1/1099511627776             0.444 ns        0.444 ns   1000000000
+BM_power2_1/35184372088832            0.443 ns        0.443 ns   1000000000
+BM_power2_1/1125899906842624          0.444 ns        0.444 ns   1000000000
+BM_power2_1/36028797018963968         0.443 ns        0.443 ns   1000000000
+BM_power2_1/1152921504606846976       0.443 ns        0.443 ns   1000000000
+BM_power2_1/9223372036854775807       0.444 ns        0.444 ns   1000000000
+BM_power2_2/-9223372036854775808      0.443 ns        0.443 ns   1000000000
+BM_power2_2/-1152921504606846976      0.443 ns        0.443 ns   1000000000
+BM_power2_2/-36028797018963968        0.444 ns        0.444 ns   1000000000
+BM_power2_2/-1125899906842624         0.444 ns        0.444 ns   1000000000
+BM_power2_2/-35184372088832           0.443 ns        0.443 ns   1000000000
+BM_power2_2/-1099511627776            0.443 ns        0.443 ns   1000000000
+BM_power2_2/-34359738368              0.444 ns        0.444 ns   1000000000
+BM_power2_2/-1073741824               0.444 ns        0.444 ns   1000000000
+BM_power2_2/-33554432                 0.443 ns        0.443 ns   1000000000
+BM_power2_2/-1048576                  0.444 ns        0.444 ns   1000000000
+BM_power2_2/-32768                    0.444 ns        0.444 ns   1000000000
+BM_power2_2/-1024                     0.445 ns        0.445 ns   1000000000
+BM_power2_2/-32                       0.444 ns        0.444 ns   1000000000
+BM_power2_2/-1                        0.443 ns        0.443 ns   1000000000
+BM_power2_2/0                         0.313 ns        0.313 ns   1000000000
+BM_power2_2/1                         0.443 ns        0.443 ns   1000000000
+BM_power2_2/32                        0.444 ns        0.444 ns   1000000000
+BM_power2_2/1024                      0.444 ns        0.443 ns   1000000000
+BM_power2_2/32768                     0.443 ns        0.443 ns   1000000000
+BM_power2_2/1048576                   0.443 ns        0.443 ns   1000000000
+BM_power2_2/33554432                  0.444 ns        0.444 ns   1000000000
+BM_power2_2/1073741824                0.443 ns        0.443 ns   1000000000
+BM_power2_2/34359738368               0.443 ns        0.443 ns   1000000000
+BM_power2_2/1099511627776             0.443 ns        0.443 ns   1000000000
+BM_power2_2/35184372088832            0.443 ns        0.443 ns   1000000000
+BM_power2_2/1125899906842624          0.444 ns        0.444 ns   1000000000
+BM_power2_2/36028797018963968         0.445 ns        0.445 ns   1000000000
+BM_power2_2/1152921504606846976       0.444 ns        0.444 ns   1000000000
+BM_power2_2/9223372036854775807       0.450 ns        0.449 ns   1000000000
+```
+
+下面是使用 i5-9500 和 gcc 8.5.0 (Red Hat 8.5.0-10) 在 CentOS-8-Stream 下得到的结果
+
+```cpp
+/tmp/tmp.CtmwmpTLjC/cmake-build-release-1104/bench/power2
+2022-03-26T13:30:11+08:00
+Running /tmp/tmp.CtmwmpTLjC/cmake-build-release-1104/bench/power2
+Run on (6 X 4099.87 MHz CPU s)
+CPU Caches:
+  L1 Data 32 KiB (x6)
+  L1 Instruction 32 KiB (x6)
+  L2 Unified 256 KiB (x6)
+  L3 Unified 9216 KiB (x1)
+Load Average: 3.17, 1.60, 1.17
+---------------------------------------------------------------------------
+Benchmark                                 Time             CPU   Iterations
+---------------------------------------------------------------------------
+BM_power2_1/-9223372036854775808      0.487 ns        0.487 ns   1000000000
+BM_power2_1/-1152921504606846976      0.496 ns        0.495 ns   1000000000
+BM_power2_1/-36028797018963968        0.490 ns        0.489 ns   1000000000
+BM_power2_1/-1125899906842624         0.489 ns        0.489 ns   1000000000
+BM_power2_1/-35184372088832           0.485 ns        0.484 ns   1000000000
+BM_power2_1/-1099511627776            0.493 ns        0.492 ns   1000000000
+BM_power2_1/-34359738368              0.488 ns        0.488 ns   1000000000
+BM_power2_1/-1073741824               0.491 ns        0.490 ns   1000000000
+BM_power2_1/-33554432                 0.489 ns        0.488 ns   1000000000
+BM_power2_1/-1048576                  0.496 ns        0.495 ns   1000000000
+BM_power2_1/-32768                    0.491 ns        0.490 ns   1000000000
+BM_power2_1/-1024                     0.491 ns        0.490 ns   1000000000
+BM_power2_1/-32                       0.484 ns        0.484 ns   1000000000
+BM_power2_1/-1                        0.495 ns        0.494 ns   1000000000
+BM_power2_1/0                         0.886 ns        0.885 ns    788464796
+BM_power2_1/1                         0.486 ns        0.486 ns   1000000000
+BM_power2_1/32                        0.491 ns        0.490 ns   1000000000
+BM_power2_1/1024                      0.489 ns        0.489 ns   1000000000
+BM_power2_1/32768                     0.491 ns        0.491 ns   1000000000
+BM_power2_1/1048576                   0.491 ns        0.490 ns   1000000000
+BM_power2_1/33554432                  0.494 ns        0.493 ns   1000000000
+BM_power2_1/1073741824                0.484 ns        0.484 ns   1000000000
+BM_power2_1/34359738368               0.492 ns        0.491 ns   1000000000
+BM_power2_1/1099511627776             0.491 ns        0.490 ns   1000000000
+BM_power2_1/35184372088832            0.495 ns        0.495 ns   1000000000
+BM_power2_1/1125899906842624          0.484 ns        0.483 ns   1000000000
+BM_power2_1/36028797018963968         0.493 ns        0.492 ns   1000000000
+BM_power2_1/1152921504606846976       0.491 ns        0.490 ns   1000000000
+BM_power2_1/9223372036854775807       0.496 ns        0.495 ns   1000000000
+BM_power2_2/-9223372036854775808      0.552 ns        0.551 ns   1000000000
+BM_power2_2/-1152921504606846976      0.552 ns        0.552 ns   1000000000
+BM_power2_2/-36028797018963968        0.561 ns        0.560 ns   1000000000
+BM_power2_2/-1125899906842624         0.546 ns        0.546 ns   1000000000
+BM_power2_2/-35184372088832           0.551 ns        0.550 ns   1000000000
+BM_power2_2/-1099511627776            0.553 ns        0.553 ns   1000000000
+BM_power2_2/-34359738368              0.552 ns        0.551 ns   1000000000
+BM_power2_2/-1073741824               0.552 ns        0.552 ns   1000000000
+BM_power2_2/-33554432                 0.553 ns        0.552 ns   1000000000
+BM_power2_2/-1048576                  0.553 ns        0.552 ns   1000000000
+BM_power2_2/-32768                    0.545 ns        0.545 ns   1000000000
+BM_power2_2/-1024                     0.554 ns        0.553 ns   1000000000
+BM_power2_2/-32                       0.548 ns        0.547 ns   1000000000
+BM_power2_2/-1                        0.546 ns        0.546 ns   1000000000
+BM_power2_2/0                         0.493 ns        0.493 ns   1000000000
+BM_power2_2/1                         0.553 ns        0.553 ns   1000000000
+BM_power2_2/32                        0.554 ns        0.553 ns   1000000000
+BM_power2_2/1024                      0.545 ns        0.544 ns   1000000000
+BM_power2_2/32768                     0.555 ns        0.555 ns   1000000000
+BM_power2_2/1048576                   0.550 ns        0.549 ns   1000000000
+BM_power2_2/33554432                  0.550 ns        0.549 ns   1000000000
+BM_power2_2/1073741824                0.555 ns        0.554 ns   1000000000
+BM_power2_2/34359738368               0.551 ns        0.550 ns   1000000000
+BM_power2_2/1099511627776             0.553 ns        0.553 ns   1000000000
+BM_power2_2/35184372088832            0.553 ns        0.552 ns   1000000000
+BM_power2_2/1125899906842624          0.552 ns        0.552 ns   1000000000
+BM_power2_2/36028797018963968         0.552 ns        0.552 ns   1000000000
+BM_power2_2/1152921504606846976       0.551 ns        0.551 ns   1000000000
+BM_power2_2/9223372036854775807       0.554 ns        0.553 ns   1000000000
+```
