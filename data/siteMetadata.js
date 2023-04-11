@@ -8,8 +8,8 @@ const siteMetadata = {
   description: '叹世界',
   language: 'zh-cn',
   theme: 'system', // system, dark or light
-  siteUrl: 'https://tailwind-nextjs-starter-blog.vercel.app',
-  siteRepo: 'https://github.com/timlrx/tailwind-nextjs-starter-blog',
+  siteUrl: 'https://www.hauhau.cn',
+  siteRepo: 'https://github.com/hominsu/blog.git',
   siteLogo: '/static/images/logo.png',
   image: '/static/images/avatar.png',
   socialBanner: '/static/images/twitter-card.png',
