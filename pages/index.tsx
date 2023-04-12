@@ -5,9 +5,9 @@ import siteMetadata from '@/data/siteMetadata'
 import { formatDate } from 'pliny/utils/formatDate'
 import { sortedBlogPost, allCoreContent } from 'pliny/utils/contentlayer'
 import { InferGetStaticPropsType } from 'next'
-import { BlogNewsletterForm } from '@/components/NewsletterForm'
 import { allBlogs } from 'contentlayer/generated'
 import type { Blog } from 'contentlayer/generated'
+import Hero from '@/components/Hero'
 
 const MAX_DISPLAY = 5
 
@@ -22,21 +22,8 @@ export default function Home({ posts }: InferGetStaticPropsType<typeof getStatic
   return (
     <>
       <PageSEO title={siteMetadata.title} description={siteMetadata.description} />
+      <Hero />
       <div>
-        <div className="my-6 flex flex-col items-center gap-x-12 xl:mb-12 xl:flex-row">
-          <div className="pt-6">
-            <h1 className="pb-6 text-3xl font-extrabold leading-9 tracking-tight text-gray-900 dark:text-gray-100 sm:text-4xl sm:leading-10 md:text-6xl md:leading-14">
-              Hi, I’m Homing So
-            </h1>
-            <h2 className="prose text-lg text-gray-600 dark:text-gray-400">
-              <strong>{`A `}</strong>
-              {`Day time student, Work time startuper, Free time open source enthusiast, Rest time loser.`}
-            </h2>
-          </div>
-          <div className="mx-2 my-12 flex w-96 items-center justify-center">
-            <BlogNewsletterForm title="Stay updated, receive the latest post straight to your mailbox" />
-          </div>
-        </div>
         <h2 className="flex pb-6 text-2xl font-extrabold tracking-tight text-gray-900 dark:text-gray-100 sm:text-3xl md:text-5xl">
           Latest
         </h2>

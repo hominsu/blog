@@ -3,7 +3,6 @@ import React from 'react'
 import { MDXLayout, ComponentMap } from 'pliny/mdx-components'
 import { TOCInline } from 'pliny/ui/TOCInline'
 import { Pre } from 'pliny/ui/Pre'
-import { BlogNewsletterForm } from 'pliny/ui/NewsletterForm'
 
 import Image from './Image'
 import CustomLink from './Link'
@@ -19,5 +18,4 @@ export const MDXComponents: ComponentMap = {
   a: CustomLink,
   pre: Pre,
   wrapper: Wrapper,
-  BlogNewsletterForm,
 }
