@@ -1,8 +1,14 @@
 import { useRef, useState } from 'react'
 
-import siteMetadata from '@/data/siteMetadata'
+export interface NewsletterFormProps {
+  title?: string
+  apiUrl?: string
+}
 
-const NewsletterForm = ({ title = 'Subscribe to the newsletter' }) => {
+const NewsletterForm = ({
+  title = 'Subscribe to the newsletter',
+  apiUrl = '/api/newsletter',
+}: NewsletterFormProps) => {
   const inputEl = useRef(null)
   const [error, setError] = useState(false)
   const [message, setMessage] = useState('')
@@ -11,7 +17,7 @@ const NewsletterForm = ({ title = 'Subscribe to the newsletter' }) => {
   const subscribe = async (e) => {
     e.preventDefault()
 
-    const res = await fetch(`/api/${siteMetadata.newsletter.provider}`, {
+    const res = await fetch(apiUrl, {
       body: JSON.stringify({
         email: inputEl.current.value,
       }),
@@ -23,7 +29,6 @@ const NewsletterForm = ({ title = 'Subscribe to the newsletter' }) => {
 
     const { error } = await res.json()
     if (error) {
-      console.log(error)
       setError(true)
       setMessage(error)
       return
@@ -76,10 +81,10 @@ const NewsletterForm = ({ title = 'Subscribe to the newsletter' }) => {
 
 export default NewsletterForm
 
-export const BlogNewsletterForm = ({ title }) => (
+export const BlogNewsletterForm = ({ title, apiUrl }: NewsletterFormProps) => (
   <div className="flex items-center justify-center">
     <div className="bg-gray-100 p-6 dark:bg-gray-800 sm:px-14 sm:py-8">
-      <NewsletterForm title={title} />
+      <NewsletterForm title={title} apiUrl={apiUrl} />
     </div>
   </div>
 )
