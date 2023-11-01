@@ -1,0 +1,153 @@
+---
+title: 'CS182/282A Spring 2023 1/23/23'
+date: '2022-08-05'
+tags: ['cs182', 'cs282a']
+draft: false
+summary: 'Basic Principles'
+authors: ['default']
+---
+
+## Standard Optimization-based paradigm for supervised learning
+
+<TOCInline toc={props.toc} exclude="Standard Optimization-based paradigm for supervised learning" toHeading={3} asDisclosure />
+
+### Ingredients
+
+- Training Data $\left( i = 1, ..., n \right)$
+- $X_i$: inputs, covariates;
+- $Y_i$: outputs, labels
+- Model $f_\theta{ \left( \cdot \right) },\theta\Leftarrow parameters$
+
+### Training via Empirical Rick Minimization
+
+$\hat{ \theta } = \mathop{\arg\min}\limits_{ \theta } \frac{1}{n} \sum\limits_{i=1}^n l_{train}\left( y_i, f_\theta\left( x_i \right) \right)$:
+
+- choose a $\hat{\theta}$ that we can learn from data that minimizes something
+- $l\left( y, \hat{y} \right) \text{ returns a real number }$: $l$ is a loss that compares $y$ to some prediction of $\hat{y}$, always return a real number(difference between Train Data which may be vectors or numbers) that we can minimizes
+
+### True Goal is Real World Performance on unseen $X$
+
+mathematical proxy:
+
+- $\exists{ P\left(X, Y\right) }$: assume a probability distribution
+- want a low $E_{X, Y}$ (expectation over $X$ and $Y$) of the loss $l\left( Y, f_\theta\left( X \right) \right)$
+
+### Complication
+
+1. We have no access to $P\left( X, Y \right)$
+
+> We want to do well on average on stuff we haven't seen, we assume that there's average make some sense and there is some underlying distribution but we don't know it
+
+Solution:
+
+- $\left( X_{test, i}, Y_{test, i} \right)_{ i = 1 }^{ n_{test} }$: Collect a Test set of held back Data
+- $\text{Test Error} = \frac{1}{n_{test}} \sum\limits_{i=1}^{n_{test}} l\left( y_{test, i}, f_{\theta}\left( x_{test, i} \right) \right)$
+
+We collected this Test set it is somewhat faithful representation of what we expect to see in the real world, and we hope that the real world follows the kinds of things that probability distributions do, so we hope that averaging and sampling gives us some predictive power on what will actually happen.
+
+> I don't know what to do, I know how to do this, so I'll just do this
+
+2. Loss $l_{true}\left( \cdot, \cdot \right)$ that we care about is incompatible with our optimizer
+
+> You want to do this, this requires something to go around and try to calculate what this argument is. That's something algorithm they'll have to do this work, that algorithm will only work if certain things happen. It might be that the loss you care about doesn't let it do what it needs to do.
+   >
+   > > You actually care about some loss that's not differentiable, because it's what's practically relevant for your problem. But your minimizer is going to be using derivatives and so yo will say can't work.
+
+Solution:
+
+- $l_{train} \left( \cdot, \cdot \right)$: use a surrogate loss that we can work with.
+
+Classic Example:
+
+1. $y \in \lbrace \text{cat}, \text{dog} \rbrace$, $l_{true}$: Hamming Loss
+
+2. $y \rightarrow \mathbf{R}$ where training data mapped to:
+$$
+\begin{equation}
+\left\{
+\begin{array}{lr}
+cat \rightarrow -1 & \\
+dog \rightarrow +1 &
+\end{array}
+\right.
+\end{equation}
+$$
+
+3. $l_{train}$: squared error
+
+>  When we're evaluating test error, we use $l_{true}$.
+   >
+   > > The purpose of evaluating test error is to get a sense of how well you might do on real world data. It is an evaluation that you're doing on a specific model that's already been optimized, no optimization is going to be happening on test error.
+
+Examples You should know:
+
+- binary classification: logistic loss, hinge loss
+- multi-classification: cross-entropy loss
+
+Aside:
+
+$\frac{1}{n} \sum\limits_{i=1}^{n} l_{true} \left( y_{i}, f_{\hat{\theta}} \left( x_{i} \right) \right)$ evaluating on the training set, different than $\frac{1}{n} \sum\limits_{i=1}^n l_{train} \left( y_i, f_{\theta} \left( x_{i} \right) \right)$
+
+> This object is kind of practically speaking for everyone who's going to be working on things is debugging.
+   >
+   > > We want to use this to understand whether or not actually optimizing our training losses doing anything reasonable with respect to the thing we actually care about, and see how well are we actually doing. Because if there was a growth, I'm gonna add some more words. If there was a grotesque mismatch between what you told this to optimize and how you were doing on the thing you were kind of moving towards, then maybe something wrong.
+
+$\frac{1}{n_{test}} \sum\limits_{i=1}^{n_{test}} l\left( y_{test,i}, f_{\theta}\left( x_{test,i} \right) \right)$
+
+> You want this to be a faithful measurement of how things might work in practice, but if you looked at this guy and said 'oh wait, okay I should have changed this, then you go back and you say 'let me look at this again', then you might be running an optimization loop involving you as the optimizer in which you're actually looking at this held back data and this data isn't begin held back anymore. And because it isn't being held back, you might not trust how well things will work in practice. (Kind of perspective on the phenomenon of overfitting)
+   >
+   > > No such care on $\frac{1}{n} \sum\limits_{i=1}^{n} l_{train} \left( y_{i}, f_{\theta} \left( x_{i} \right) \right)$, because you're already using this data to evaluate how well you're doing, In the sense of your optimization algorithm is looking at it all the time. So whether you choose to take other views of it, Is cost free.
+
+3. You run your Optimizer with your surrogate loss and we get "crazy" values for $\hat{\theta}$ you're on the Optimizer, and/or you get really bad test performance. (Another kind of perspective on the phenomenon of overfitting)
+
+Solution:
+
+- Add an explicit regression during training: $\hat{\theta} = \mathop{\arg\min}\limits_{\theta} \left( \frac{1}{n} \sum\limits_{i=1}^{n} l_{train} \left( y_{i}, f_{\theta} \left( x_{i} \right) \right) \right) + R_{\lambda} \left( \theta \right)$, e.g. Ridge Regression: $R\left( \theta \right) = \lambda\| \theta \|^2$
+
+Notice: we added another parameter $\lambda$. How do we choose it?
+
+> Native Hyper parameters: $\hat{\theta} = \mathop{\arg\min}\limits_{\theta, \lambda^{\geq0}} \left( \frac{}{} \right)$
+
+- Split parameters into "Normal parameters $\theta$, and Hyper parameters $\lambda$"
+
+> "Hyper parameter is a parameter that if you let the optimizer just work with it, it would go crazy, so you have to segregate it out"
+
+> Hold Out additional Data(Validation Set), use that to optimize hyper parameters
+     >
+     > > When you do hyper parameter optimization using the validation set, you might be using different kind of optimizer than you used for the argument you’re doing for finding your parameters. So typically in the context of deep learning this thing is always going to be some variation of gradient descent is what we use to do this kind of setting. But for hyper parameter setting you might be doing a Brute Force grid search or searches based invoking ideas related to things like multi-ram Bandits or other techniques of you know zeroth order optimization algorithms that will help you do that, you can also use for some hyper parameter searches gradient based approaches when it.
+
+All Solution:
+
+- Simplify model: "Reduce model order"
+
+### Further Complication
+
+- The Optimizer might have its own parameters. e.g. learning rate
+
+ > Generally, optimizers might have their own tunable knobs. And in pratice, as a someone trying to do deep learning, you’re going to have discrete choice of which optimizer to use.
+
+ > You see a two subtly different perspective.
+
+- Most basic/root optimizer approach: Gradient Descent
+
+ > Gradient Descent is an iterative optimization approach where you make improvements and you make then locally.
+
+- Idea: Change parameter a little bit at a time.
+
+ > All you care about is how does your loss behave in the neighborhood of the parameters you're in.
+
+So look at local neighborhood of loss around.
+
+$\theta_{t+1} = \theta_{t} + \eta \left( - \nabla_{\theta} L_{train, \theta} \right), L_{train, \theta} = \frac{1}{n} \sum\limits_{i=1}^{n} l_{train} \left( y_{i}, f_{\theta} \left( x_{i} \right) \right) + R \left( \cdot \right)$
+
+ > This is a Discrete-time Dynamic System
+
+ > $\eta \leftarrow \text{ "step size"/"learning rate" }$, this $\eta$ controls stability of this system
+   >
+   > $\eta$ too large, Dynamics go unstable (it oscillate)
+   >
+   > $\eta$ too small, it takes to long too converge
+
+$L_{train} \left( \theta_{+} + \Delta\theta \right) \approx L_{train} \left( \theta_{+} \right) + \underbrace{\frac{\partial}{\partial\theta} L_{train}}_{\text{"row"}} \rfloor_{\theta_{+}} \Delta\theta$
+
+ > The transpose of this "row" is called the gradient
