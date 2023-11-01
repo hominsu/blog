@@ -24,9 +24,8 @@ export default function Footer() {
           <Link href="/">{siteMetadata.title}</Link>
         </div>
         <div className="mb-8 text-sm text-gray-500 dark:text-gray-400">
-          <Link href="https://github.com/timlrx/tailwind-nextjs-starter-blog">
-            Tailwind Nextjs Theme
-          </Link>
+          <Link href="http://www.beian.gov.cn/portal/registerSystemInfo?recordcode=44060602001954">{`粤公网安备 44060602001954 `}</Link>
+          <Link href="https://beian.miit.gov.cn/">{`| 粤ICP备 2021022310号-1`}</Link>
         </div>
       </div>
     </footer>
