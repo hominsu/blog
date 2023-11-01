@@ -1,0 +1,245 @@
+---
+title: '绝对值 ——《C/C++ 位运算黑科技 01》'
+date: '2022-03-06'
+tags: ['cpp', 'bits', 'hacks']
+draft: false
+summary: '使用位运算计算整数的绝对值'
+authors: ['default']
+---
+
+## 原理
+
+求一个数的绝对值就是将负数转为正数, 只需要求其补码即可（反码加一）
+
+## 代码
+
+```cpp:abs.cc
+template <typename T, class = typename std::enable_if_t<!std::is_unsigned_v<T>>>
+inline typename std::make_unsigned_t<T> mabs(T _val) { 
+    const T mask = _val >> (sizeof(T) * 8 - 1);
+    return (_val ^ mask) - mask;
+}
+```
+
+## 原理剖析
+
+以 -12 为例：-12 的补码为 `10100`（这里假设机器字长为 5 位）
+
+步骤如下：
+
+- 先获取掩码 `mask`:
+
+  ```cpp
+  const T mask = _val >> (sizeof(T) * 8 - 1);
+  ```
+
+  10100 左移 4 位得到 11111, 注意这里的 11111, 是一个非常精巧的设计。
+
+  为什么我们是选择右移获取掩码, 而不是直接右移四位然后 & 上 0x1 得到符号位, 原因在于：11111 这个掩码实际上全部都是由符号位组成, 如果符号位是 1, 那么生成的掩码可以直接与原来的数据进行异或运算得到反码, 然后加 1 就得到了补码。
+
+  如果符号位为 0, 那么得到的掩码则为全 0, 0 异或任何数等于它本身。
+
+- 求反码：
+
+  ```cpp
+  _val ^= mask;
+  ```
+
+  如上一个步骤所示, 10100 异或上 11111 等于 01011, 即求得反码
+
+  而如果在这里是一个正数, 掩码就是 00000, 异或之后不变
+
+- 加 1:
+
+  ```cpp
+  _val - mask;
+  ```
+
+  01011 - 11111 = 01100 得到 -12 的绝对值 12
+
+  为什么这里的加一变成了减 mask？其实很简单, 之前我们求得的 mask 为 11111, 这个其实就是 -1 的补码, 加 1 只要减去 mask 即可。
+
+  而如果这里是一个正数, 掩码就是 00000, 减 0 不会产生影响。
+
+如此一来, 我们就实现了绝对值求解的算法, 负数进入之后就会转为正数, 正数进入之后不发生变动, 是不是很简单？
+
+## Benchmark
+
+```cpp {3-7} showLineNumbers
+#include "benchmark/benchmark.h"
+
+template<typename T, class = typename std::enable_if_t<!std::is_unsigned_v<T>>>
+inline typename std::make_unsigned_t<T> mabs(T _val) {
+  const T mask = _val >> (sizeof(T) * 8 - 1);
+  return (_val + mask) ^ mask;
+}
+
+static void BM_mabs(benchmark::State &state) {
+  for (auto _: state) {
+    benchmark::DoNotOptimize(mabs(state.range(0)));
+  }
+}
+
+static void BM_std_abs(benchmark::State &state) {
+  for (auto _: state) {
+    benchmark::DoNotOptimize(std::abs(state.range(0)));
+  }
+}
+
+BENCHMARK(BM_mabs)->RangeMultiplier(32)->Range(INT64_MIN, INT64_MAX);
+BENCHMARK(BM_std_abs)->RangeMultiplier(32)->Range(INT64_MIN, INT64_MAX);
+
+BENCHMARK_MAIN();
+```
+
+下面是使用 MacBook Air (M1, 2020) 和 Apple clang 13.1.6 得到的结果
+
+```cpp
+/Users/hominsu/CLionProjects/bit-hacks-bench/cmake-build-release-appleclang/bench/abs
+Unable to determine clock rate from sysctl: hw.cpufrequency: No such file or directory
+2022-03-26T13:00:40+08:00
+Running /Users/hominsu/CLionProjects/bit-hacks-bench/cmake-build-release-appleclang/bench/abs
+Run on (8 X 24.1207 MHz CPU s)
+CPU Caches:
+  L1 Data 64 KiB (x8)
+  L1 Instruction 128 KiB (x8)
+  L2 Unified 4096 KiB (x2)
+Load Average: 2.42, 2.09, 2.29
+--------------------------------------------------------------------------
+Benchmark                                Time             CPU   Iterations
+--------------------------------------------------------------------------
+BM_mabs/-9223372036854775808         0.340 ns        0.340 ns   1000000000
+BM_mabs/-1152921504606846976         0.344 ns        0.344 ns   1000000000
+BM_mabs/-36028797018963968           0.342 ns        0.342 ns   1000000000
+BM_mabs/-1125899906842624            0.336 ns        0.336 ns   1000000000
+BM_mabs/-35184372088832              0.343 ns        0.343 ns   1000000000
+BM_mabs/-1099511627776               0.342 ns        0.342 ns   1000000000
+BM_mabs/-34359738368                 0.343 ns        0.343 ns   1000000000
+BM_mabs/-1073741824                  0.343 ns        0.343 ns   1000000000
+BM_mabs/-33554432                    0.344 ns        0.344 ns   1000000000
+BM_mabs/-1048576                     0.345 ns        0.345 ns   1000000000
+BM_mabs/-32768                       0.344 ns        0.344 ns   1000000000
+BM_mabs/-1024                        0.343 ns        0.343 ns   1000000000
+BM_mabs/-32                          0.347 ns        0.347 ns   1000000000
+BM_mabs/-1                           0.343 ns        0.343 ns   1000000000
+BM_mabs/0                            0.344 ns        0.344 ns   1000000000
+BM_mabs/1                            0.346 ns        0.346 ns   1000000000
+BM_mabs/32                           0.341 ns        0.341 ns   1000000000
+BM_mabs/1024                         0.346 ns        0.346 ns   1000000000
+BM_mabs/32768                        0.347 ns        0.347 ns   1000000000
+BM_mabs/1048576                      0.348 ns        0.348 ns   1000000000
+BM_mabs/33554432                     0.344 ns        0.344 ns   1000000000
+BM_mabs/1073741824                   0.340 ns        0.340 ns   1000000000
+BM_mabs/34359738368                  0.350 ns        0.350 ns   1000000000
+BM_mabs/1099511627776                0.343 ns        0.343 ns   1000000000
+BM_mabs/35184372088832               0.339 ns        0.339 ns   1000000000
+BM_mabs/1125899906842624             0.341 ns        0.341 ns   1000000000
+BM_mabs/36028797018963968            0.341 ns        0.341 ns   1000000000
+BM_mabs/1152921504606846976          0.348 ns        0.348 ns   1000000000
+BM_mabs/9223372036854775807          0.346 ns        0.346 ns   1000000000
+BM_std_abs/-9223372036854775808      0.340 ns        0.340 ns   1000000000
+BM_std_abs/-1152921504606846976      0.345 ns        0.345 ns   1000000000
+BM_std_abs/-36028797018963968        0.347 ns        0.347 ns   1000000000
+BM_std_abs/-1125899906842624         0.340 ns        0.340 ns   1000000000
+BM_std_abs/-35184372088832           0.348 ns        0.348 ns   1000000000
+BM_std_abs/-1099511627776            0.345 ns        0.345 ns   1000000000
+BM_std_abs/-34359738368              0.347 ns        0.347 ns   1000000000
+BM_std_abs/-1073741824               0.344 ns        0.344 ns   1000000000
+BM_std_abs/-33554432                 0.342 ns        0.342 ns   1000000000
+BM_std_abs/-1048576                  0.347 ns        0.347 ns   1000000000
+BM_std_abs/-32768                    0.345 ns        0.345 ns   1000000000
+BM_std_abs/-1024                     0.347 ns        0.347 ns   1000000000
+BM_std_abs/-32                       0.348 ns        0.348 ns   1000000000
+BM_std_abs/-1                        0.341 ns        0.341 ns   1000000000
+BM_std_abs/0                         0.352 ns        0.352 ns   1000000000
+BM_std_abs/1                         0.346 ns        0.346 ns   1000000000
+BM_std_abs/32                        0.348 ns        0.348 ns   1000000000
+BM_std_abs/1024                      0.344 ns        0.344 ns   1000000000
+BM_std_abs/32768                     0.342 ns        0.342 ns   1000000000
+BM_std_abs/1048576                   0.348 ns        0.348 ns   1000000000
+BM_std_abs/33554432                  0.346 ns        0.346 ns   1000000000
+BM_std_abs/1073741824                0.346 ns        0.346 ns   1000000000
+BM_std_abs/34359738368               0.347 ns        0.347 ns   1000000000
+BM_std_abs/1099511627776             0.343 ns        0.343 ns   1000000000
+BM_std_abs/35184372088832            0.347 ns        0.347 ns   1000000000
+BM_std_abs/1125899906842624          0.351 ns        0.351 ns   1000000000
+BM_std_abs/36028797018963968         0.340 ns        0.340 ns   1000000000
+BM_std_abs/1152921504606846976       0.346 ns        0.346 ns   1000000000
+BM_std_abs/9223372036854775807       0.343 ns        0.343 ns   1000000000
+```
+
+下面是使用 i5-9500 和 gcc 8.5.0 (Red Hat 8.5.0-10) 得到的结果
+
+```cpp
+/tmp/tmp.CtmwmpTLjC/cmake-build-release-1104/bench/abs
+2022-03-26T13:10:38+08:00
+Running /tmp/tmp.CtmwmpTLjC/cmake-build-release-1104/bench/abs
+Run on (6 X 4138.24 MHz CPU s)
+CPU Caches:
+  L1 Data 32 KiB (x6)
+  L1 Instruction 32 KiB (x6)
+  L2 Unified 256 KiB (x6)
+  L3 Unified 9216 KiB (x1)
+Load Average: 0.94, 0.61, 0.49
+--------------------------------------------------------------------------
+Benchmark                                Time             CPU   Iterations
+--------------------------------------------------------------------------
+BM_mabs/-9223372036854775808         0.366 ns        0.366 ns   1000000000
+BM_mabs/-1152921504606846976         0.367 ns        0.367 ns   1000000000
+BM_mabs/-36028797018963968           0.366 ns        0.365 ns   1000000000
+BM_mabs/-1125899906842624            0.368 ns        0.367 ns   1000000000
+BM_mabs/-35184372088832              0.370 ns        0.370 ns   1000000000
+BM_mabs/-1099511627776               0.364 ns        0.364 ns   1000000000
+BM_mabs/-34359738368                 0.370 ns        0.370 ns   1000000000
+BM_mabs/-1073741824                  0.364 ns        0.364 ns   1000000000
+BM_mabs/-33554432                    0.367 ns        0.367 ns   1000000000
+BM_mabs/-1048576                     0.368 ns        0.368 ns   1000000000
+BM_mabs/-32768                       0.371 ns        0.370 ns   1000000000
+BM_mabs/-1024                        0.365 ns        0.365 ns   1000000000
+BM_mabs/-32                          0.365 ns        0.365 ns   1000000000
+BM_mabs/-1                           0.364 ns        0.363 ns   1000000000
+BM_mabs/0                            0.368 ns        0.368 ns   1000000000
+BM_mabs/1                            0.366 ns        0.365 ns   1000000000
+BM_mabs/32                           0.364 ns        0.363 ns   1000000000
+BM_mabs/1024                         0.368 ns        0.368 ns   1000000000
+BM_mabs/32768                        0.370 ns        0.369 ns   1000000000
+BM_mabs/1048576                      0.368 ns        0.367 ns   1000000000
+BM_mabs/33554432                     0.366 ns        0.366 ns   1000000000
+BM_mabs/1073741824                   0.367 ns        0.366 ns   1000000000
+BM_mabs/34359738368                  0.371 ns        0.371 ns   1000000000
+BM_mabs/1099511627776                0.368 ns        0.367 ns   1000000000
+BM_mabs/35184372088832               0.370 ns        0.369 ns   1000000000
+BM_mabs/1125899906842624             0.363 ns        0.362 ns   1000000000
+BM_mabs/36028797018963968            0.368 ns        0.367 ns   1000000000
+BM_mabs/1152921504606846976          0.372 ns        0.372 ns   1000000000
+BM_mabs/9223372036854775807          0.367 ns        0.366 ns   1000000000
+BM_std_abs/-9223372036854775808      0.491 ns        0.490 ns   1000000000
+BM_std_abs/-1152921504606846976      0.484 ns        0.484 ns   1000000000
+BM_std_abs/-36028797018963968        0.490 ns        0.490 ns   1000000000
+BM_std_abs/-1125899906842624         0.487 ns        0.486 ns   1000000000
+BM_std_abs/-35184372088832           0.493 ns        0.493 ns   1000000000
+BM_std_abs/-1099511627776            0.486 ns        0.485 ns   1000000000
+BM_std_abs/-34359738368              0.491 ns        0.491 ns   1000000000
+BM_std_abs/-1073741824               0.487 ns        0.486 ns   1000000000
+BM_std_abs/-33554432                 0.490 ns        0.490 ns   1000000000
+BM_std_abs/-1048576                  0.489 ns        0.488 ns   1000000000
+BM_std_abs/-32768                    0.494 ns        0.493 ns   1000000000
+BM_std_abs/-1024                     0.490 ns        0.489 ns   1000000000
+BM_std_abs/-32                       0.491 ns        0.490 ns   1000000000
+BM_std_abs/-1                        0.486 ns        0.486 ns   1000000000
+BM_std_abs/0                         0.492 ns        0.492 ns   1000000000
+BM_std_abs/1                         0.487 ns        0.486 ns   1000000000
+BM_std_abs/32                        0.487 ns        0.486 ns   1000000000
+BM_std_abs/1024                      0.493 ns        0.492 ns   1000000000
+BM_std_abs/32768                     0.489 ns        0.489 ns   1000000000
+BM_std_abs/1048576                   0.492 ns        0.491 ns   1000000000
+BM_std_abs/33554432                  0.487 ns        0.486 ns   1000000000
+BM_std_abs/1073741824                0.493 ns        0.492 ns   1000000000
+BM_std_abs/34359738368               0.486 ns        0.486 ns   1000000000
+BM_std_abs/1099511627776             0.493 ns        0.492 ns   1000000000
+BM_std_abs/35184372088832            0.489 ns        0.488 ns   1000000000
+BM_std_abs/1125899906842624          0.491 ns        0.491 ns   1000000000
+BM_std_abs/36028797018963968         0.490 ns        0.490 ns   1000000000
+BM_std_abs/1152921504606846976       0.494 ns        0.493 ns   1000000000
+BM_std_abs/9223372036854775807       0.491 ns        0.490 ns   1000000000
+```
