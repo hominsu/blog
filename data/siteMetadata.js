@@ -3,7 +3,7 @@ const siteMetadata = {
   title: '叹世界',
   author: 'Homing So',
   headerTitle: '叹世界',
-  description: '叹世界',
+  description: '頂硬上',
   language: 'zh-cn',
   theme: 'system', // system, dark or light
   siteUrl: 'https://www.hauhau.cn',
