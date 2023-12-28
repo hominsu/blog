@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  slink:
+    image: hominsu/blog:latest
+    container_name: blog
+    restart: always
+    environment:
+      TZ: "Asia/Shanghai"
+    ports:
+      - "3000:3000"
+    networks:
+      net:
+        aliases:
+          - blog
+
+networks:
+  net:
+    driver: bridge
