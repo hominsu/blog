@@ -1,0 +1,108 @@
+---
+title: '如何在 Windows 中优雅的使用 sing-box'
+date: '2024-02-11'
+tags: ['sing-box', 'winsw', 'proxy', 'windows']
+draft: false
+layout: PostBannerLayout
+summary: 'The blog discusses how to install and configure sing-box, a next-generation universal proxy platform, on Windows using direct download or package managers, and outlines setting it up as a Windows service for automatic execution using WinSW.'
+authors: ['default']
+---
+
+## 什么是 sing-box
+
+[sing-box](https://github.com/SagerNet/sing-box) 是新一代的通用代理平台，对标 [Xray-core](https://github.com/XTLS/Xray-core) 和 clash，并且它支持多种协议（名副其实），并且性能非常强劲。
+
+## sing-box 客户端
+
+截至目前，sing-box 的官方图形界面客户端支持：
+
+- Android: [sing-box for Android](https://sing-box.sagernet.org/zh/clients/android/)
+- iOS/macOS/Apple tvOS: [sing-box for Apple platforms](https://sing-box.sagernet.org/zh/clients/apple/)
+
+而 Windows 桌面端仍在开发中，虽说有第三方图形化客户端的支持，例如：
+
+- [GUI.for.SingBox](https://github.com/GUI-for-Cores/GUI.for.SingBox)
+- [Hiddify-Next](https://github.com/hiddify/hiddify-next)
+
+但是这些客户端的可用性较差，很多机场提供的链接无法直接使用，并且还需要额外的学习成本。虽然官方 Windows 的图形界面客户端还在开发中，但是 NON-GUI 还是完美支持的。对于有 CLI 使用基础的朋友，本文可以帮助你在 Windows 上优雅的使用 sing-box cli。
+
+## 安装 sing-box
+
+这里提供两种方法安装 sing-box cli:
+
+- 直接到 Release 中下载 Windows 的可以执行文件：https://github.com/SagerNet/sing-box/releases/latest
+- 使用包管理进行安装
+
+第一种方法不需要做过多解释，唯一要注意的是，你可能已经注意到了所有 AMD64 架构会有两个版本（darwin、linux 和 windows 都有），一个只标了 `amd64`，一个是 `amd64v3`，要如何选择呢？
+
+这是东西是 GO 1.18 引入的 [Architecture Level](https://tip.golang.org/wiki/MinimumRequirements#amd64)，不同之处在于编译器能够使用到的指令集：
+
+- GOAMD64=v1 (default): Baseline. 所有 64 位 x86 处理器都能使用
+- GOAMD64=v2: v1 所有的指令集，加上 CMPXCHG16B, LAHF, SAHF, POPCNT, SSE3, SSE4.1, SSE4.2, SSSE3.
+- GOAMD64=v3: v2 所有的指令集，加上 AVX, AVX2, BMI1, BMI2, F16C, FMA, LZCNT, MOVBE, OSXSAVE.
+- GOAMD64=v4: v3 所有的指令集，加上 AVX512F, AVX512BW, AVX512CD, AVX512DQ, AVX512VL.
+
+简单来说就是 Level 越高，可用指令也就越新，编译出来的代码性能可能有一定提升，但是兼容性就越差。如果你不知道你的 CPU 支持什么指令集，那么用 `amd64` 准没错。
+
+第二种方法就是使用 Windows 平台的包管理器来进行安装，例如 [Scoop](https://scoop.sh/)、[Chocolatey](https://chocolatey.org/) 等，包管理器安装方法查看官方文档就好。
+
+```markdown
+# 如果你使用 Scoop
+scoop install sing-box
+
+# 如果你使用 Chocolatey
+choco install sing-box
+```
+
+这种方法的优势是你不用在理会 sing-box 的更新等等琐事，这些事情包管理器会帮你完成。
+
+## 配置 sing-box 服务
+
+如果每次使用 sing-box 都得打开 terminal 的话也太烦人，所以最好是将它配置成一个 Windows 的服务，这样我们就不用每次重启还要手动运行了，把这些工作都交给 Windows！为了实现这个目的，我们要用到 [WinSW](https://github.com/winsw/winsw)，这是一个可以将任何可执行文件配置成 Windows 服务的工具。
+
+先创建一个目录，这里我的目录就叫 sing-box，然后下载 [WinSW-x64.exe](https://github.com/winsw/winsw/releases/tag/v2.12.0)，放到这个目录并将其重命名为：`winsw.exe`。然后我们创建一个 `winsw.xml`，通过这个文件对 sing-box 进行配置。注意！这两个文件的名字一定要相同，否则 WinSW 将无法读取到配置文件。
+
+然后编辑 `winsw.xml`，写入以下内容：
+
+```xml
+<service>
+  <id>sing-box</id>
+  <name>sing-box</name>
+  <description>This service runs sing-box continuous integration system.</description>
+  <download from="https://你的订阅链接" to="%BASE%\config.json" auth="sspi" />
+  <executable>C:\Users\homin\scoop\shims\sing-box.exe</executable>
+  <arguments>run</arguments>
+  <log mode="reset" />
+  <onfailure action="restart" />
+</service>
+```
+
+这里解释几个参数：
+
+- `<download>`：在指定的 `<executable>` 运行前，WinSW 会从指定的 URL 获取资源并将其作为文件放到本地。`%BASE%` 指向 WinSW 的目录，所以这里将订阅链接的内容重命名为 `config.json` 并放到当前目录下。
+- `<executable>`：指定要启动的可执行文件，这里指定为 Scoop 安装的 sing-box 的路径，这个路径可以在安装完 sing-box 之后使用：`whereis sing-box` 获取。
+- `<arguments>`：指定要传递给可执行文件的参数，这里传递的是 `run`。因为执行的位置就在当前路径，所以不需要指定 `config.json` 的路径。
+
+完成后，使用 `./winsw.exe -h` 可以查看 WinSW 的所有指令：
+
+```powershell
+./winsw.exe -h
+```
+
+现在使用：`./winsw.exe install` 安装服务，安装完成后系统每次重启都会自动运行 sing-box，但是现在我们先用 `./winsw.exe start` 来启动服务，你将会在当前目录下看到 `winsw.wrapper.log` 文件，这个文件包含服务启动时的日志，如果一切正常，那么日志应该是这样：
+
+```
+2024-02-07 11:34:16,941 DEBUG - Starting WinSW in console mode
+2024-02-07 11:34:19,748 DEBUG - Starting WinSW in console mode
+2024-02-07 11:34:19,802 INFO  - Starting service 'sing-box (sing-box)'...
+2024-02-07 11:34:20,512 DEBUG - Starting WinSW in service mode
+2024-02-07 11:34:20,559 INFO  - Service 'sing-box (sing-box)' started successfully.
+2024-02-07 11:34:20,629 INFO  - Downloading: https://你的订阅链接 to C:\Users\homin\workspace\sing-box\config.json. failOnError=False
+2024-02-07 11:34:23,004 INFO  - Starting C:\Users\homin\scoop\shims\sing-box.exe run
+2024-02-07 11:34:23,043 INFO  - Started process 27484
+2024-02-07 11:34:23,063 DEBUG - Forwarding logs of the process System.Diagnostics.Process (sing-box) to WinSW.ResetLogAppender
+```
+
+而目录中的 `winsw.out.log` 保存了 sing-box 运行时产生的日志。
+
+到这里，我们已经实现了在 Windows 上无感使用 sing-box，并且实现自动更新订阅。
