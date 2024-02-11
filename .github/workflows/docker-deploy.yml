@@ -51,15 +51,12 @@ jobs:
           username: ${{ env.id }}
           password: ${{ env.token }}
 
-      - name: Set Up QEMU
-        id: qemu
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set Up Docker Buildx
-        id: buildx
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
-          install: true
+          version: "lab:latest"
+          driver: cloud
+          endpoint: "hominsu/builder"
 
       - name: Build and Push ${{ matrix.registry.name }}
         run: >
