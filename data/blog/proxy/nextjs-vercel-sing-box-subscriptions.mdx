@@ -1,0 +1,528 @@
+---
+title: 'NextJS + Vercel：高效处理 sing-box 订阅链接'
+date: '2024-02-24'
+tags: ['sing-box', 'nextjs', 'vercel',]
+draft: false
+layout: PostBannerLayout
+summary: 'This post explains how to manage sing-box subscription links in NextJS and deploy on Vercel, offering a streamlined approach to customize and optimize these links.'
+authors: ['default']
+---
+
+## 什么是 sing-box
+
+[sing-box](https://github.com/SagerNet/sing-box) 是新一代的通用代理平台，对标 [Xray-core](https://github.com/XTLS/Xray-core) 和 clash，并且它支持多种协议（名副其实），并且性能非常强劲。
+
+## sing-box 订阅链接
+
+sing-box 的客户端都支持导入在线的订阅链接，而且现在大多数机场都开始支持 sing-box，提供了 sing-box 的订阅链接。
+
+但是这些订阅链接的编写质量参差不齐，有的规则甚至不能满足我们的需求。因此，这篇文章教你如何自力更生，使用 [NextJS](https://nextjs.org) 的 [API Routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) 对订阅链接进行实时转换，然后使用 [Vercel](https://vercel.com) 进行部署（白嫖它不香吗？）。所有代码放在 [subconv](https://github.com/hominsu/subconv)
+
+## 新建 NextJS 项目
+
+这里使用 Yarn
+
+```bash
+> yarn create next-app
+
+yarn create v1.22.19
+(node:29916) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[1/4] 🔍  Resolving packages...
+[2/4] 🚚  Fetching packages...
+[3/4] 🔗  Linking dependencies...
+[4/4] 🔨  Building fresh packages...
+success Installed "create-next-app@14.1.0" with binaries:
+      - create-next-app
+✔ What is your project named? … subconv
+✔ Would you like to use TypeScript? … No / Yes
+✔ Would you like to use ESLint? … No / Yes
+✔ Would you like to use Tailwind CSS? … No / Yes
+✔ Would you like to use `src/` directory? … No / Yes
+✔ Would you like to use App Router? (recommended) … No / Yes
+✔ Would you like to customize the default import alias (@/*)? … No / Yes
+Creating a new Next.js app in /Users/hominsu/Other/subconv.
+
+Using yarn.
+
+Initializing project with template: app-tw 
+
+
+Installing dependencies:
+- react
+- react-dom
+- next
+
+Installing devDependencies:
+- typescript
+- @types/node
+- @types/react
+- @types/react-dom
+- autoprefixer
+- postcss
+- tailwindcss
+- eslint
+- eslint-config-next
+
+yarn install v1.22.19
+info No lockfile found.
+[1/4] 🔍  Resolving packages...
+⠁ (node:30069) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[2/4] 🚚  Fetching packages...
+[3/4] 🔗  Linking dependencies...
+[4/4] 🔨  Building fresh packages...
+success Saved lockfile.
+✨  Done in 91.32s.
+Initialized a git repository.
+
+Success! Created subconv at /Users/hominsu/Other/subconv
+
+✨  Done in 117.46s.
+```
+
+新建项目之后，进入项目，将 Yarn 的版本设置到最新，并重新 `yarn install`
+
+```bash
+> cd subconv
+> ls
+README.md          next-env.d.ts      node_modules       postcss.config.js  tailwind.config.ts yarn.lock
+app                next.config.mjs    package.json       public             tsconfig.json
+
+> yarn set version stable
+➤ YN0000: Done in 0s 9ms
+
+> yarn install
+➤ YN0087: Migrated your project to the latest Yarn version 🚀
+
+➤ YN0000: · Yarn 4.1.0
+➤ YN0000: ┌ Resolution step
+➤ YN0085: │ + @types/node@npm:20.11.19, @types/react-dom@npm:18.2.19, @types/react@npm:18.2.57, autoprefixer@npm:10.4.17, and 410 more.
+➤ YN0000: └ Completed in 3s 911ms
+➤ YN0000: ┌ Fetch step
+➤ YN0013: │ 58 packages were added to the project (+ 12.85 MiB).
+➤ YN0000: └ Completed in 0s 440ms
+➤ YN0000: ┌ Link step
+➤ YN0000: └ Completed in 3s 146ms
+➤ YN0000: · Done in 7s 535ms
+```
+
+对于 NextJS 和 Tailwind CSS 的配置，这里不做详细说明，还请移步 [subconv](https://github.com/hominsu/subconv) 查看
+
+## 编辑订阅链接
+
+我们使用 NextJS 的 API routes 来实现对订阅链接进行转换，思路大概如下：
+
+- 机场提供了一串订阅链接，e.g. https://feed.xxx.com/c/your-uuid/platform/singbox
+- 将这串订阅链接作为我们订阅转换 API 的 PATH，i.e. https://yoursite.cn/api/conv/feed.xxx.com/c/your-uuid/platform/singbox
+- 当我们访问这个 API，NextJS 只要访问机场，然后下载对应的订阅数据，然后进行提取、修改等操作，然后将修改好的订阅数据返回
+
+有了思路之后就开始一步一步实现，首先我们先创建好目录，在项目目录下创建一个 lib 目录，保存我们的 utils 和 template
+
+```bash
+./lib
+├── template.json
+└── utils.ts
+
+1 directory, 2 files
+```
+
+`utils.ts` 中主要包含两个 helper function，`omitKeys` 的作用是删除 Object/Object Array 中的指定的键值对，而 `removeValue` 的作用是从指定的 Array 中某个值
+
+```typescript:utils.ts
+export const omitKeys = <T extends object>(
+  input: T | T[],
+  keysToRemove: Array<keyof T>
+): T | T[] => {
+  const removeKeysFromObject = (obj: T): T => {
+    return Object.entries(obj).reduce((acc, [key, value]) => {
+      if (!keysToRemove.includes(key as keyof T)) {
+        ;(acc as any)[key] = value
+      }
+      return acc
+    }, {} as T)
+  }
+
+  return Array.isArray(input) ? input.map(removeKeysFromObject) : removeKeysFromObject(input)
+}
+
+export const removeValue = <T extends object, V>(
+  input: T | T[],
+  targetKey: keyof T,
+  valueToRemove: V
+): T | T[] => {
+  const removeValueFromObject = (obj: T): T => {
+    return Object.entries(obj).reduce((acc, [key, value]) => {
+      if (key === targetKey && Array.isArray(value)) {
+        value = value.filter((item: V) => item !== valueToRemove)
+      }
+      ;(acc as any)[key] = value
+      return acc
+    }, {} as T)
+  }
+
+  return Array.isArray(input)
+    ? input.map((item) => removeValueFromObject(item))
+    : removeValueFromObject(input)
+}
+```
+
+`template.json` 中就是我们的自定义的规则，只要将提取出来的 `outbounds` 放入其中就能够正常使用。关于 sing-box 的配置，可以参考这篇文章：[https://icloudnative.io/posts/sing-box-tutorial/#sing-box-配置解析](https://icloudnative.io/posts/sing-box-tutorial/#sing-box-配置解析)，讲解的很详细，这里不做另外说明。
+
+```json:template.json
+{
+  "log": {
+    "level": "warn",
+    "timestamp": true
+  },
+  "dns": {
+    "servers": [
+      {
+        "tag": "cf",
+        "address": "https://1.1.1.1/dns-query",
+        "detour": "节点选择"
+      },
+      {
+        "tag": "local",
+        "address": "https://223.5.5.5/dns-query",
+        "detour": "direct"
+      },
+      {
+        "tag": "block",
+        "address": "rcode://success"
+      }
+    ],
+    "rules": [
+      {
+        "geosite": "category-ads-all",
+        "server": "block",
+        "disable_cache": true
+      },
+      {
+        "outbound": "any",
+        "server": "local"
+      },
+      {
+        "clash_mode": "direct",
+        "server": "local"
+      },
+      {
+        "clash_mode": "global",
+        "server": "cf"
+      },
+      {
+        "geosite": "cn",
+        "server": "local"
+      },
+      {
+        "process_name": [
+          "TencentMeeting",
+          "NemoDesktop",
+          "ToDesk",
+          "ToDesk_Service",
+          "WeChat",
+          "Tailscale",
+          "wireguard-go",
+          "Tunnelblick",
+          "softwareupdated",
+          "kubectl"
+        ],
+        "server": "local"
+      },
+      {
+        "domain_suffix": [
+          "hauhau.cn",
+          "um.edu.mo",
+          "cdn.jsdelivr.net"
+        ],
+        "server": "local"
+      }
+    ],
+    "strategy": "ipv4_only"
+  },
+  "inbounds": [
+    {
+      "type": "tun",
+      "inet4_address": "198.18.0.1/16",
+      "auto_route": true,
+      "exclude_package": [
+        "cmb.pb",
+        "cn.gov.pbc.dcep",
+        "com.MobileTicket",
+        "com.adguard.android",
+        "com.ainemo.dragoon",
+        "com.alibaba.android.rimet",
+        "com.alicloud.databox",
+        "com.amazing.cloudisk.tv",
+        "com.autonavi.minimap",
+        "com.bilibili.app.in",
+        "com.bishua666.luxxx1",
+        "com.cainiao.wireless",
+        "com.chebada",
+        "com.chinamworld.main",
+        "com.cmbchina.ccd.pluto.cmbActivity",
+        "com.coolapk.market",
+        "com.ctrip.ct",
+        "com.dianping.v1",
+        "com.douban.frodo",
+        "com.eg.android.AlipayGphone",
+        "com.farplace.qingzhuo",
+        "com.hanweb.android.zhejiang.activity",
+        "com.leoao.fitness",
+        "com.lucinhu.bili_you",
+        "com.mikrotik.android.tikapp",
+        "com.moji.mjweather",
+        "com.motorola.cn.calendar",
+        "com.motorola.cn.lrhealth",
+        "com.netease.cloudmusic",
+        "com.sankuai.meituan",
+        "com.sina.weibo",
+        "com.smartisan.notes",
+        "com.sohu.inputmethod.sogou.moto",
+        "com.sonelli.juicessh",
+        "com.ss.android.article.news",
+        "com.ss.android.lark",
+        "com.ss.android.ugc.aweme",
+        "com.tailscale.ipn",
+        "com.taobao.idlefish",
+        "com.taobao.taobao",
+        "com.tencent.mm",
+        "com.tencent.mp",
+        "com.tencent.soter.soterserver",
+        "com.tencent.wemeet.app",
+        "com.tencent.weread",
+        "com.tencent.wework",
+        "com.ttxapps.wifiadb",
+        "com.unionpay",
+        "com.unnoo.quan",
+        "com.wireguard.android",
+        "com.xingin.xhs",
+        "com.xunmeng.pinduoduo",
+        "com.zui.zhealthy",
+        "ctrip.android.view",
+        "io.kubenav.kubenav",
+        "org.geekbang.geekTime",
+        "tv.danmaku.bili"
+      ],
+      "stack": "mixed",
+      "sniff": true
+    }
+  ],
+  "outbounds": [],
+  "route": {
+    "auto_detect_interface": true,
+    "final": "节点选择",
+    "find_process": true,
+    "rules": [
+      {
+        "rule_set": "geosite-category-ads-all",
+        "outbound": "block"
+      },
+      {
+        "protocol": "dns",
+        "outbound": "dns-out"
+      },
+      {
+        "clash_mode": "direct",
+        "outbound": "direct"
+      },
+      {
+        "clash_mode": "global",
+        "outbound": "节点选择"
+      },
+      {
+        "domain_suffix": [
+          "um.edu.mo"
+        ],
+        "outbound": "direct"
+      },
+      {
+        "rule_set": "geosite-apple",
+        "outbound": "direct"
+      },
+      {
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {
+            "process_name": [
+              "TencentMeeting",
+              "NemoDesktop",
+              "ToDesk",
+              "ToDesk_Service",
+              "WeChat",
+              "OpenLens",
+              "Tailscale",
+              "wireguard-go",
+              "Tunnelblick",
+              "softwareupdated",
+              "kubectl"
+            ]
+          },
+          {
+            "ip_is_private": true
+          },
+          {
+            "rule_set": "geoip-cn"
+          },
+          {
+            "rule_set": "geosite-cn"
+          },
+          {
+            "rule_set": "geosite-geolocation-cn"
+          }
+        ],
+        "outbound": "direct"
+      },
+      {
+        "rule_set": "geosite-netflix",
+        "outbound": "Netflix"
+      },
+      {
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {
+            "rule_set": "geosite-bing"
+          },
+          {
+            "rule_set": "geosite-openai"
+          },
+          {
+            "package_name": "com.openai.chatgpt"
+          },
+          {
+            "domain_suffix": [
+              "openai.com",
+              "oaistatic.com",
+              "oaiusercontent.com",
+              "claude.ai",
+              "bard.google.com"
+            ]
+          }
+        ],
+        "outbound": "OPENAi"
+      }
+    ],
+    "rule_set": [
+      {
+        "tag": "geoip-cn",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs",
+        "download_detour": "节点选择"
+      },
+      {
+        "tag": "geosite-cn",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs",
+        "download_detour": "节点选择"
+      },
+      {
+        "tag": "geosite-netflix",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-netflix.srs",
+        "download_detour": "节点选择"
+      },
+      {
+        "tag": "geosite-apple",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-apple.srs",
+        "download_detour": "节点选择"
+      },
+      {
+        "tag": "geosite-bing",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-bing.srs",
+        "download_detour": "节点选择"
+      },
+      {
+        "tag": "geosite-openai",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-openai.srs",
+        "download_detour": "节点选择"
+      },
+      {
+        "tag": "geosite-geolocation-cn",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-geolocation-cn.srs",
+        "download_detour": "节点选择"
+      },
+      {
+        "tag": "geosite-category-ads-all",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs",
+        "download_detour": "节点选择"
+      }
+    ]
+  },
+  "experimental": {
+    "cache_file": {
+      "enabled": true
+    },
+    "clash_api": {
+      "external_controller": "0.0.0.0:9090",
+      "external_ui": "metacubexd",
+      "external_ui_download_url": "https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip",
+      "external_ui_download_detour": "节点选择",
+      "default_mode": "rule"
+    }
+  }
+}
+```
+
+然后创建我们的路由，目录结构如下
+
+```bash
+./pages
+└── api
+    └── conv
+        └── [[...sub]].ts
+
+3 directories, 1 file
+```
+
+我们使用 `[[...sub]]` 去捕获 `/api/conv/` 后面的所有 PATH，`[[...sub]].ts` 的内容如下
+
+```typescript:[[...sub]].ts
+import type { NextApiRequest, NextApiResponse } from 'next'
+import axios from 'axios'
+
+import template from '@/lib/template.json'
+import { omitKeys, removeValue } from '@/lib/utils'
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const externalUrl = Array.isArray(req.query.sub) ? req.query.sub.join('/') : req.query.sub
+  const fullUrl = `https://${externalUrl}`
+
+  try {
+    const { data } = await axios.get(fullUrl)
+    const outbounds = removeValue(
+      omitKeys(data?.outbounds, ['url', 'interval', 'idle_timeout', 'tolerance']),
+      'outbounds',
+      'direct'
+    )
+    if (outbounds) {
+      template.outbounds = outbounds
+      res.status(200).json(template)
+    } else {
+      res.status(404).json({ message: 'outbounds data not found' })
+    }
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      res.status(500).json({ message: error.message })
+    } else {
+      res.status(500).json({ message: 'An unexpected error occurred' })
+    }
+  }
+}
+```
+
+这个 API 的作用很简单，就是读取订阅链接中的数据，然后删除提取 outbounds，并把里面的 `url`, `interval`, `idle_timeout` 和 `tolerance` 这些没有必要的冗余设置，然后把 outbounds 里面的 selector 中的 outbounds 中的 direct 删除，最后把 outbounds 放进我们提前定义 template 里面，然后就可以使用我们自己定义的规则了。
