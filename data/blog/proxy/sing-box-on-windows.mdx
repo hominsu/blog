@@ -35,7 +35,7 @@ authors: ['default']
 
 第一种方法不需要做过多解释，唯一要注意的是，你可能已经注意到了所有 AMD64 架构会有两个版本（darwin、linux 和 windows 都有），一个只标了 `amd64`，一个是 `amd64v3`，要如何选择呢？
 
-这是东西是 GO 1.18 引入的 [Architecture Level](https://tip.golang.org/wiki/MinimumRequirements#amd64)，不同之处在于编译器能够使用到的指令集：
+这是东西是 GO 1.18 引入的 Architecture Level[^1]，不同之处在于编译器能够使用到的指令集：
 
 - GOAMD64=v1 (default): Baseline. 所有 64 位 x86 处理器都能使用
 - GOAMD64=v2: v1 所有的指令集，加上 CMPXCHG16B, LAHF, SAHF, POPCNT, SSE3, SSE4.1, SSE4.2, SSSE3.
@@ -77,7 +77,7 @@ choco install sing-box
 </service>
 ```
 
-这里解释几个参数：
+这里解释几个参数[^2]：
 
 - `<download>`：在指定的 `<executable>` 运行前，WinSW 会从指定的 URL 获取资源并将其作为文件放到本地。`%BASE%` 指向 WinSW 的目录，所以这里将订阅链接的内容重命名为 `config.json` 并放到当前目录下。
 - `<executable>`：指定要启动的可执行文件，这里指定为 Scoop 安装的 sing-box 的路径，这个路径可以在安装完 sing-box 之后使用：`whereis sing-box` 获取。
@@ -107,8 +107,5 @@ choco install sing-box
 
 到这里，我们已经实现了在 Windows 上无感使用 sing-box，并且实现自动更新订阅。
 
-## Reference
-
-- [https://sing-box.sagernet.org](https://sing-box.sagernet.org)
-- [https://tip.golang.org/wiki/MinimumRequirements#amd64](https://tip.golang.org/wiki/MinimumRequirements#amd64)
-- [https://github.com/winsw/winsw/blob/v3/docs/xml-config-file.md](https://github.com/winsw/winsw/blob/v3/docs/xml-config-file.md)
+[^1]: https://tip.golang.org/wiki/MinimumRequirements#amd64
+[^2]: https://github.com/winsw/winsw/blob/v3/docs/xml-config-file.md
