@@ -6,7 +6,7 @@ const siteMetadata = {
   description: '頂硬上',
   language: 'zh-cn',
   theme: 'system', // system, dark or light
-  siteUrl: 'https://www.hauhau.cn',
+  siteUrl: 'https://homing.so',
   siteRepo: 'https://github.com/hominsu/blog',
   siteLogo: '/static/images/logo.png',
   image: '/static/images/avatar.png',
