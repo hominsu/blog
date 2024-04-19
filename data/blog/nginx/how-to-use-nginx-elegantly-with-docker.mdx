@@ -1,0 +1,345 @@
+---
+title: '优雅地在 Docker 中使用 NGINX'
+date: '2024-04-19'
+tags: ['docker', 'nginx', 'vps']
+draft: false
+layout: PostBannerLayout
+summary: 'This post explains setting up NGINX in Docker, covering SSL automation with acme.sh, using Docker Compose for configuration, and enabling features like streaming and modules. It includes steps for certificate updates, custom NGINX builds with additional modules, and optimizing configurations for specific applications.'
+authors: ['default']
+---
+
+## Why NGINX on Docker
+
+Docker 提供了一个只和配置相关的环境，我们不需要关注 NGINX 的内部细节，通过 containerized 完全可以做到在任意一台 VPS 上都能快速部署我们的 NGINX。但是在 Docker 中使用 NGINX 其实还存在许多问题：
+
+- 怎么处理 NGINX 的 conf
+- 证书如何自动更新
+- 如何开启 NGINX 的其他功能，例如：stream，modules
+
+这篇文章将一个一个的解决上述问题，最终达成一个优雅的 NGINX on Docker 的体验。
+
+## 开始！
+
+acme.sh 实现了 `acme` 协议，可以从 `Let's Encrypt`, `ZeroSSL`, `Google`, `Buypass` 和 `SSL.com` 等 CA 生成免费的证书，并实现证书的管理和更新。
+
+我们会使用 acme.sh 来对 NGINX 的证书进行管理，实现自动更新。
+
+首先创建下面的目录结构，`acmeout` 用于保存 acme.sh 生成的帐号信息和证书的信息等，这些数据请妥善保存！`nginx` 中放的是 NGINX 自身相关的配置文件。`ssl` 中放的是 NGINX 中会用到的证书，不需要我们手动管理，而是使用 acme.sh 对证书进行部署。`templates` 中放着我们用到的网站的配置模版，容器在 NGINX 启动之前会将其中的环境变量提取出来。
+
+```md
+.
+|-- acmeout
+|-- docker-compose.yml
+|-- nginx
+| |-- modules.conf
+| `-- nginx.conf
+|-- ssl
+`-- templates
+```
+
+下面是 `docker-compose.yml` 的内容，需要特别注意的是 `labels`，只有正确设定了这个 label，我们才能使用 acme.sh 将证书 deploy 到 NGINX 容器中的目录。然后就是 NGINX 的 `network_mode` 选择 `host` 模式而不是 `bridge` 会让我们省去很多麻烦，避免我们做不需要的端口映射。
+
+```yaml:docker-compose.yml
+services:
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    restart: always
+    environment:
+      TZ: "Asia/Shanghai"
+    volumes:
+      - "./nginx/nginx.conf:/etc/nginx/nginx.conf:ro"
+      - "./nginx/modules.conf:/etc/nginx/modules.conf:ro"
+      - "./templates:/etc/nginx/templates"
+      - "./ssl:/etc/nginx/ssl"
+    labels:
+      - sh.acme.autoload.domain=nginx
+    network_mode: host
+
+  acme.sh:
+    image: neilpang/acme.sh
+    container_name: acme.sh
+    command: daemon
+    volumes:
+      - ./acmeout:/acme.sh
+      - /var/run/docker.sock:/var/run/docker.sock
+```
+
+下面是 `nginx.conf` 的内容，需要进行一些修改，首先就是 `include modules.conf`， `modules.conf` 中的内容是用来加载一些模块的，这部分内容我会在后面提到，现在只需要创建这么一个空文件就可以了：`touch modules.conf`，将其分离是为了避免我们频繁修改 NGINX 的重要配置。然后我们还需要开启 `stream`，来做四层代理。
+
+```diff:nginx.conf
+
+user  nginx;
+worker_processes  auto;
++
++include modules.conf;
+
+error_log  /var/log/nginx/error.log notice;
+pid        /var/run/nginx.pid;
+
+
+events {
+    worker_connections  1024;
+}
+
+
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+
+    log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
+
+    access_log  /var/log/nginx/access.log  main;
+
+    sendfile        on;
+    #tcp_nopush     on;
+
+    keepalive_timeout  65;
+
+    #gzip  on;
+
+    include /etc/nginx/conf.d/*.conf;
+}
+
++stream {
++    log_format	main  '$remote_addr [$time_local] '
++                      '$protocol $bytes_sent $bytes_received '
++                      '$session_time';
++
++    include /etc/nginx/conf.d/*.stream;
++}
++
+```
+
+配置完成后，只要是放在 `templates` 目录下的 `*.template` 文件，最后都会提取其中的环境变量，然后放到 `/etc/nginx/conf.d` 中。所以，对于上述的配置，如果是 http 配置，要命名为 `*.conf.template`，而 stream 配置要命名为 `*.stream.template`。
+
+## Step By Step
+
+我们以部署一个 NextJS 站点为例，来演示如何配置 acme.sh 和 NGINX。
+
+首先，你需要一个域名，然后需要对应 DNS 提供商的 API 的 Key 和 Secret，来对域名进行验证，关于这部分，参阅 [https://github.com/acmesh-official/acme.sh/wiki/dnsapi#dns_gd](https://github.com/acmesh-official/acme.sh/wiki/dnsapi#dns_gd)
+
+`docker compose up -d` 启动容器后，首先注册你的 account
+
+```bash
+docker exec acme.sh --register-account -m your@email.com
+```
+
+首次签发证书，需要指定一下你的 DNS 提供商的 API Key 和 Secret（我用的是 Ali），acme.sh 会帮你自动添加和删除 verify，等待一段时间后证书就签下来了。
+
+```bash
+docker exec \
+-e Ali_Key=xxx \
+-e Ali_Secret=xxx \
+acme.sh --issue --dns dns_ali -d your.domain.name
+```
+
+下一步是将签发的证书 deploy 到我们的 nginx 容器中的 `/etc/nginx/ssl`，我们把这个目录映射到了 `ssl` 下，这样的话也不担心容器重启会丢失掉证书。需要确认的是：`ca.pem`，`cert.pem`，`full.pem` 和 `key.pem` 都齐全了，如果不全，那就在运行一次。
+
+```bash
+docker exec \
+-e DEPLOY_DOCKER_CONTAINER_LABEL=sh.acme.autoload.domain=nginx \
+-e DEPLOY_DOCKER_CONTAINER_KEY_FILE=/etc/nginx/ssl/your.domain.name/key.pem \
+-e DEPLOY_DOCKER_CONTAINER_CERT_FILE=/etc/nginx/ssl/your.domain.name/cert.pem \
+-e DEPLOY_DOCKER_CONTAINER_CA_FILE=/etc/nginx/ssl/your.domain.name/ca.pem \
+-e DEPLOY_DOCKER_CONTAINER_FULLCHAIN_FILE=/etc/nginx/ssl/your.domain.name/full.pem \
+-e DEPLOY_DOCKER_CONTAINER_RELOAD_CMD="service nginx force-reload" \
+acme.sh --deploy -d your.domain.name --deploy-hook docker
+```
+
+完成证书的配置后，接下来添加 NGINX 的配置，`upstream` 设置为 NextJS 站点的 IP 加端口，这里是 `127.0.0.1:3000`，后面的就是正常的 NGINX 配置了，不过需要注意证书的位置是在 `/etc/nginx/ssl` 中，完成配置后，`docker compose up -d && docker compose down -v` 来重启 NGINX Docker，生成对应的 conf。
+
+```nginx:app.conf.template
+upstream website {
+    server 127.0.0.1:3000;
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name your.domain.name;
+
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name your.domain.name;
+
+    ssl_certificate /etc/nginx/ssl/your.domain.name/full.pem;
+    ssl_certificate_key /etc/nginx/ssl/your.domain.name/key.pem;
+
+    ssl_session_timeout 5m;
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers TLS13_AES_128_GCM_SHA256:TLS13_AES_256_GCM_SHA384:TLS13_CHACHA20_POLY1305_SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305;
+    ssl_prefer_server_ciphers on;
+
+    location / {
+       proxy_set_header Host $host;
+       proxy_set_header X-Real-IP $remote_addr;
+       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+       proxy_set_header X-Forwarded-Proto "https";
+       proxy_pass http://website;
+    }
+    error_page   500 502 503 504  /50x.html;
+}
+```
+
+## Other
+
+通常我们会用到 NGINX 中的很多 modules，例如 `ngx_http_geoip2_module` 和 `ngx_stream_geoip2_module`，那么 NGINX Docker 并没有内置这些 modules，所以需要我们去 build 一个 NGINX 来使用这些 modules，下面的 Dockerfile 就能够对要用到的模块进行编译，只需要在 NGINX 维护的 [pkg-oss](https://hg.nginx.org/pkg-oss) 中找到你需要的 module，将名字记下来，然后设定 `ENABLED_MODULES` 环境变量完成编译即可。
+
+```dockerfile:Dockerfile
+ARG NGINX_FROM_IMAGE=nginx:mainline
+FROM ${NGINX_FROM_IMAGE} as builder
+
+ARG ENABLED_MODULES
+
+SHELL ["/bin/bash", "-exo", "pipefail", "-c"]
+
+RUN if [ "$ENABLED_MODULES" = "" ]; then \
+        echo "No additional modules enabled, exiting"; \
+        exit 1; \
+    fi
+
+COPY ./ /modules/
+
+RUN apt-get update \
+    && apt-get install -y --no-install-suggests --no-install-recommends \
+                patch make wget mercurial devscripts debhelper dpkg-dev \
+                quilt lsb-release build-essential libxml2-utils xsltproc \
+                equivs git g++ libparse-recdescent-perl \
+    && XSLSCRIPT_SHA512="f7194c5198daeab9b3b0c3aebf006922c7df1d345d454bd8474489ff2eb6b4bf8e2ffe442489a45d1aab80da6ecebe0097759a1e12cc26b5f0613d05b7c09ffa *stdin" \
+    && wget -O /tmp/xslscript.pl https://hg.nginx.org/xslscript/raw-file/01dc9ba12e1b/xslscript.pl \
+    && if [ "$(cat /tmp/xslscript.pl | openssl sha512 -r)" = "$XSLSCRIPT_SHA512" ]; then \
+        echo "XSLScript checksum verification succeeded!"; \
+        chmod +x /tmp/xslscript.pl; \
+        mv /tmp/xslscript.pl /usr/local/bin/; \
+    else \
+        echo "XSLScript checksum verification failed!"; \
+        exit 1; \
+    fi \
+    && hg clone -r ${NGINX_VERSION}-${PKG_RELEASE%%~*} https://hg.nginx.org/pkg-oss/ \
+    && cd pkg-oss \
+    && mkdir /tmp/packages \
+    && for module in $ENABLED_MODULES; do \
+        echo "Building $module for nginx-$NGINX_VERSION"; \
+        if [ -d /modules/$module ]; then \
+            echo "Building $module from user-supplied sources"; \
+            # check if module sources file is there and not empty
+            if [ ! -s /modules/$module/source ]; then \
+                echo "No source file for $module in modules/$module/source, exiting"; \
+                exit 1; \
+            fi; \
+            # some modules require build dependencies
+            if [ -f /modules/$module/build-deps ]; then \
+                echo "Installing $module build dependencies"; \
+                apt-get update && apt-get install -y --no-install-suggests --no-install-recommends $(cat /modules/$module/build-deps | xargs); \
+            fi; \
+            # if a module has a build dependency that is not in a distro, provide a
+            # shell script to fetch/build/install those
+            # note that shared libraries produced as a result of this script will
+            # not be copied from the builder image to the main one so build static
+            if [ -x /modules/$module/prebuild ]; then \
+                echo "Running prebuild script for $module"; \
+                /modules/$module/prebuild; \
+            fi; \
+            /pkg-oss/build_module.sh -v $NGINX_VERSION -f -y -o /tmp/packages -n $module $(cat /modules/$module/source); \
+            BUILT_MODULES="$BUILT_MODULES $(echo $module | tr '[A-Z]' '[a-z]' | tr -d '[/_\-\.\t ]')"; \
+        elif make -C /pkg-oss/debian list | grep -P "^$module\s+\d" > /dev/null; then \
+            echo "Building $module from pkg-oss sources"; \
+            cd /pkg-oss/debian; \
+            make rules-module-$module BASE_VERSION=$NGINX_VERSION NGINX_VERSION=$NGINX_VERSION; \
+            mk-build-deps --install --tool="apt-get -o Debug::pkgProblemResolver=yes --no-install-recommends --yes" debuild-module-$module/nginx-$NGINX_VERSION/debian/control; \
+            make module-$module BASE_VERSION=$NGINX_VERSION NGINX_VERSION=$NGINX_VERSION; \
+            find ../../ -maxdepth 1 -mindepth 1 -type f -name "*.deb" -exec mv -v {} /tmp/packages/ \;; \
+            BUILT_MODULES="$BUILT_MODULES $module"; \
+        else \
+            echo "Don't know how to build $module module, exiting"; \
+            exit 1; \
+        fi; \
+    done \
+    && echo "BUILT_MODULES=\"$BUILT_MODULES\"" > /tmp/packages/modules.env
+
+FROM ${NGINX_FROM_IMAGE}
+RUN --mount=type=bind,target=/tmp/packages/,source=/tmp/packages/,from=builder \
+    apt-get update \
+    && . /tmp/packages/modules.env \
+    && for module in $BUILT_MODULES; do \
+           apt-get install --no-install-suggests --no-install-recommends -y /tmp/packages/nginx-module-${module}_${NGINX_VERSION}*.deb; \
+       done \
+    && rm -rf /var/lib/apt/lists/
+```
+
+这里介绍一种 Docker 的高级构建方法，Docker Buildx Bake。
+
+首先新建一个 `docker-bake.hcl` 文件，它使用 Terraform 语言来编写配置，填入以下内容，要注意设置 `REPO` 为你的 Docker Hub Repo， 设置 `ENABLED_MODULES` 为我们需要的模块（这里用到 geoip2）。然后使用 `docker buildx bake --file docker-bake.hcl --push` 就可以完成多平台的 Docker Imgae 的编译，你也可以通过指定 `VERSION` 来控制 tag，例如：`VERSION=1.25.4 docker buildx bake --file docker-bake.hcl --push`，除了 `latest` 之外，还会额外生成一个 `1.25.4` 的 tag。
+
+更进一步，你也可以结合 Github Action 使用，具体可以参考我的仓库：[https://github.com/hominsu/nginx](https://github.com/hominsu/nginx)
+
+```terraform:docker-bake.hcl
+variable "REPO" {
+  default = "hominsu"
+}
+
+variable "VERSION" {
+  default = ""
+}
+
+group "default" {
+  targets = [
+    "nginx",
+  ]
+}
+
+target "nginx" {
+  context    = "."
+  dockerfile = "Dockerfile"
+  args       = {
+    ENABLED_MODULES = "geoip2"
+  }
+  tags = [
+    notequal("", VERSION) ? "${REPO}/nginx:${VERSION}" : "",
+    "${REPO}/nginx:latest",
+  ]
+  platforms = [
+    "linux/386",
+    "linux/amd64",
+    "linux/arm/v5",
+    "linux/arm/v7",
+    "linux/arm64",
+  ]
+}
+```
+
+完成编译后，首先需要修改的就是 NGINX 对应的 `docker-compose.yml` 中的镜像地址
+
+```diff
+services:
+  nginx:
+-    image: nginx:latest
++    image: hominsu/nginx:latest
+    container_name: nginx
+```
+
+然后就是修改 `modules.conf` 中的内容，需要将我们编译的 modules load 进去才能使用，以 `geoip2` 为例：
+
+```nginx
+load_module modules/ngx_http_geoip2_module.so;
+load_module modules/ngx_stream_geoip2_module.so;
+```
+
+现在就能够正常的使用 `geoip2` 了。
+
+## Reference
+
+- [https://hub.docker.com/\_/nginx](https://hub.docker.com/_/nginx)
+- [https://github.com/acmesh-official/acme.sh/wiki](https://github.com/acmesh-official/acme.sh/wiki)
+- [https://github.com/nginxinc/docker-nginx/tree/master/modules](https://github.com/nginxinc/docker-nginx/tree/master/modules)
+- [https://hg.nginx.org/pkg-oss](https://hg.nginx.org/pkg-oss)
