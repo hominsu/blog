@@ -21,6 +21,12 @@ const projectsData: Project[] = [
     href: 'https://github.com/hominsu/bencode',
   },
   {
+    title: 'freegpt35',
+    description: `Unlimited free GPT-3.5 turbo API service.`,
+    imgSrc: '',
+    href: 'https://github.com/hominsu/freegpt35',
+  },
+  {
     title: 'slink',
     description: `A short link application base on kratos`,
     imgSrc: '',
