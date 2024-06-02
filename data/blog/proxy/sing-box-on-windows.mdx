@@ -48,9 +48,11 @@ authors: ['default']
 
 ```markdown
 # 如果你使用 Scoop
+
 scoop install sing-box
 
 # 如果你使用 Chocolatey
+
 choco install sing-box
 ```
 
@@ -106,6 +108,8 @@ choco install sing-box
 而目录中的 `winsw.out.log` 保存了 sing-box 运行时产生的日志。
 
 到这里，我们已经实现了在 Windows 上无感使用 sing-box，并且实现自动更新订阅。
+
+> 注意！如果出现无法使用的情况，大概率是没有允许 sing-box 访问网络，在具有管理员权限在目录中运行：`sing-box.exe run`，然后同意连接。如果更新 sing-box 再次出现这个问题，还是可以使用这个方法解决。
 
 [^1]: https://tip.golang.org/wiki/MinimumRequirements#amd64
 [^2]: https://github.com/winsw/winsw/blob/v3/docs/xml-config-file.md
