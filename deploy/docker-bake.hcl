@@ -29,7 +29,6 @@ target "blog" {
     VERSION           = "$(VERSION)"
   }
   secret = [
-    "type=env,id=EXPORT",
     "type=env,id=NEXT_ALGOLIA_APIKEY",
     "type=env,id=NEXT_ALGOLIA_APPID",
     "type=env,id=NEXT_ALGOLIA_INDEX_NAME",

@@ -63,7 +63,7 @@ const articleMapping = new Map([
   ['d6e69539', 'other/trust-project-env.mdx'],
 ])
 
-const output = process.env.EXPORT ? 'export' : undefined
+const output = process.env.EXPORT ? 'export' : 'standalone'
 const basePath = process.env.BASE_PATH || undefined
 const unoptimized = process.env.UNOPTIMIZED ? true : undefined
 

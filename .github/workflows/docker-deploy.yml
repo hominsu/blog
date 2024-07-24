@@ -62,7 +62,6 @@ jobs:
         run: >
           REPO=${{ matrix.registry.push_link }}
           VERSION=${{ needs.set-matrix.outputs.git_tag }}
-          EXPORT=${{ secrets.EXPORT }}
           NEXT_ALGOLIA_APIKEY=${{ secrets.NEXT_ALGOLIA_APIKEY }}
           NEXT_ALGOLIA_APPID=${{ secrets.NEXT_ALGOLIA_APPID }}
           NEXT_ALGOLIA_INDEX_NAME=${{ secrets.NEXT_ALGOLIA_INDEX_NAME }}
