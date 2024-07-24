@@ -21,7 +21,8 @@ COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED 1
 
-RUN --mount=type=secret,id=NEXT_ALGOLIA_APIKEY \
+RUN --mount=type=secret,id=EXPORT \
+    --mount=type=secret,id=NEXT_ALGOLIA_APIKEY \
     --mount=type=secret,id=NEXT_ALGOLIA_APPID \
     --mount=type=secret,id=NEXT_ALGOLIA_INDEX_NAME \
     --mount=type=secret,id=NEXT_PUBLIC_GISCUS_CATEGORY \
@@ -29,6 +30,7 @@ RUN --mount=type=secret,id=NEXT_ALGOLIA_APIKEY \
     --mount=type=secret,id=NEXT_PUBLIC_GISCUS_REPO \
     --mount=type=secret,id=NEXT_PUBLIC_GISCUS_REPOSITORY_ID \
     --mount=type=secret,id=NEXT_UMAMI_ID \
+    EXPORT=$(cat /run/secrets/EXPORT) \
     NEXT_ALGOLIA_APIKEY=$(cat /run/secrets/NEXT_ALGOLIA_APIKEY) \
     NEXT_ALGOLIA_APPID=$(cat /run/secrets/NEXT_ALGOLIA_APPID) \
     NEXT_ALGOLIA_INDEX_NAME=$(cat /run/secrets/NEXT_ALGOLIA_INDEX_NAME) \
