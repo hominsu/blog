@@ -5,9 +5,6 @@ services:
     restart: always
     environment:
       TZ: "Asia/Shanghai"
-      NEXT_ALGOLIA_APIKEY: ""
-      NEXT_ALGOLIA_APPID: ""
-      NEXT_ALGOLIA_INDEX_NAME: ""
       NEXT_UMAMI_ID: ""
     ports:
       - "3000:3000"
