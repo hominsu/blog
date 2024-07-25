@@ -62,12 +62,11 @@ jobs:
         run: >
           REPO=${{ matrix.registry.push_link }}
           VERSION=${{ needs.set-matrix.outputs.git_tag }}
-          NEXT_ALGOLIA_APIKEY=${{ secrets.NEXT_ALGOLIA_APIKEY }}
-          NEXT_ALGOLIA_APPID=${{ secrets.NEXT_ALGOLIA_APPID }}
-          NEXT_ALGOLIA_INDEX_NAME=${{ secrets.NEXT_ALGOLIA_INDEX_NAME }}
+          NEXT_PUBLIC_ALGOLIA_APIKEY=${{ secrets.NEXT_ALGOLIA_APIKEY }}
+          NEXT_PUBLIC_ALGOLIA_APPID=${{ secrets.NEXT_ALGOLIA_APPID }}
+          NEXT_PUBLIC_ALGOLIA_INDEX_NAME=${{ secrets.NEXT_ALGOLIA_INDEX_NAME }}
           NEXT_PUBLIC_GISCUS_CATEGORY=${{ secrets.NEXT_PUBLIC_GISCUS_CATEGORY }}
           NEXT_PUBLIC_GISCUS_CATEGORY_ID=${{ secrets.NEXT_PUBLIC_GISCUS_CATEGORY_ID }}
           NEXT_PUBLIC_GISCUS_REPO=${{ secrets.NEXT_PUBLIC_GISCUS_REPO }}
           NEXT_PUBLIC_GISCUS_REPOSITORY_ID=${{ secrets.NEXT_PUBLIC_GISCUS_REPOSITORY_ID }}
-          NEXT_UMAMI_ID=${{ secrets.NEXT_UMAMI_ID }}
           docker buildx bake --file deploy/docker-bake.hcl --push

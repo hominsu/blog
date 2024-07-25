@@ -21,22 +21,20 @@ COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED 1
 
-RUN --mount=type=secret,id=NEXT_ALGOLIA_APIKEY \
-    --mount=type=secret,id=NEXT_ALGOLIA_APPID \
-    --mount=type=secret,id=NEXT_ALGOLIA_INDEX_NAME \
+RUN --mount=type=secret,id=NEXT_PUBLIC_ALGOLIA_APIKEY \
+    --mount=type=secret,id=NEXT_PUBLIC_ALGOLIA_APPID \
+    --mount=type=secret,id=NEXT_PUBLIC_ALGOLIA_INDEX_NAME \
     --mount=type=secret,id=NEXT_PUBLIC_GISCUS_CATEGORY \
     --mount=type=secret,id=NEXT_PUBLIC_GISCUS_CATEGORY_ID \
     --mount=type=secret,id=NEXT_PUBLIC_GISCUS_REPO \
     --mount=type=secret,id=NEXT_PUBLIC_GISCUS_REPOSITORY_ID \
-    --mount=type=secret,id=NEXT_UMAMI_ID \
-    NEXT_ALGOLIA_APIKEY=$(cat /run/secrets/NEXT_ALGOLIA_APIKEY) \
-    NEXT_ALGOLIA_APPID=$(cat /run/secrets/NEXT_ALGOLIA_APPID) \
-    NEXT_ALGOLIA_INDEX_NAME=$(cat /run/secrets/NEXT_ALGOLIA_INDEX_NAME) \
+    NEXT_PUBLIC_ALGOLIA_APIKEY=$(cat /run/secrets/NEXT_PUBLIC_ALGOLIA_APIKEY) \
+    NEXT_PUBLIC_ALGOLIA_APPID=$(cat /run/secrets/NEXT_PUBLIC_ALGOLIA_APPID) \
+    NEXT_PUBLIC_ALGOLIA_INDEX_NAME=$(cat /run/secrets/NEXT_PUBLIC_ALGOLIA_INDEX_NAME) \
     NEXT_PUBLIC_GISCUS_CATEGORY=$(cat /run/secrets/NEXT_PUBLIC_GISCUS_CATEGORY) \
     NEXT_PUBLIC_GISCUS_CATEGORY_ID=$(cat /run/secrets/NEXT_PUBLIC_GISCUS_CATEGORY_ID) \
     NEXT_PUBLIC_GISCUS_REPO=$(cat /run/secrets/NEXT_PUBLIC_GISCUS_REPO) \
     NEXT_PUBLIC_GISCUS_REPOSITORY_ID=$(cat /run/secrets/NEXT_PUBLIC_GISCUS_REPOSITORY_ID) \
-    NEXT_UMAMI_ID=$(cat /run/secrets/NEXT_UMAMI_ID) \
     yarn build
 
 

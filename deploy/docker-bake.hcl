@@ -29,14 +29,13 @@ target "blog" {
     VERSION           = "$(VERSION)"
   }
   secret = [
-    "type=env,id=NEXT_ALGOLIA_APIKEY",
-    "type=env,id=NEXT_ALGOLIA_APPID",
-    "type=env,id=NEXT_ALGOLIA_INDEX_NAME",
+    "type=env,id=NEXT_PUBLIC_ALGOLIA_APIKEY",
+    "type=env,id=NEXT_PUBLIC_ALGOLIA_APPID",
+    "type=env,id=NEXT_PUBLIC_ALGOLIA_INDEX_NAME",
     "type=env,id=NEXT_PUBLIC_GISCUS_CATEGORY",
     "type=env,id=NEXT_PUBLIC_GISCUS_CATEGORY_ID",
     "type=env,id=NEXT_PUBLIC_GISCUS_REPO",
     "type=env,id=NEXT_PUBLIC_GISCUS_REPOSITORY_ID",
-    "type=env,id=NEXT_UMAMI_ID"
   ]
   tags = [
     notequal("", VERSION) ? "${REPO}/blog:${VERSION}" : "",

@@ -81,10 +81,10 @@ const siteMetadata = {
     provider: 'algolia',
     algoliaConfig: {
       // The application ID provided by Algolia
-      appId: process.env.NEXT_ALGOLIA_APPID,
+      appId: process.env.NEXT_PUBLIC_ALGOLIA_APPID,
       // Public API key: it is safe to commit it
-      apiKey: process.env.NEXT_ALGOLIA_APIKEY,
-      indexName: process.env.NEXT_ALGOLIA_INDEX_NAME,
+      apiKey: process.env.NEXT_PUBLIC_ALGOLIA_APIKEY,
+      indexName: process.env.NEXT_PUBLIC_ALGOLIA_INDEX_NAME,
     },
   },
 }
