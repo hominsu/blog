@@ -45,7 +45,7 @@ RUN --mount=type=secret,id=NEXT_PUBLIC_ALGOLIA_APIKEY \
 FROM scratch AS export
 
 COPY --from=builder /app/public /app/public
-COPY --from=builder /app/.next/standalone /app/.next/standalone
+COPY --from=builder /app/.next/standalone /app/
 COPY --from=builder /app/.next/static /app/.next/static
 COPY --from=deps /sharp/node_modules/.pnpm /app/node_modules/.pnpm
 
@@ -69,4 +69,4 @@ EXPOSE 3000/tcp
 
 # server.js is created by next build from the standalone output
 # https://nextjs.org/docs/pages/api-reference/next-config-js/output
-CMD ["node", "server.js"]
+CMD ["node", "/app/server.js"]
