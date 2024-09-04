@@ -1,18 +1,4 @@
-variable "REPO" {
-  default = "hominsu"
-}
-
-variable "AUTHOR_NAME" {
-  default = "Homing So"
-}
-
-variable "AUTHOR_EMAIL" {
-  default = "homingso@foxmail.com"
-}
-
-variable "VERSION" {
-  default = ""
-}
+target "metadata" {}
 
 group "default" {
   targets = [
@@ -20,14 +6,16 @@ group "default" {
   ]
 }
 
+target "cross" {
+  platforms = [
+    "linux/arm64", 
+    "linux/amd64"
+  ]
+}
+
 target "blog" {
-  context    = "."
+  inherits = [ "metadata", "cross" ]
   dockerfile = "deploy/Dockerfile"
-  args       = {
-    AUTHOR_NAME       = "${AUTHOR_NAME}"
-    AUTHOR_EMAIL      = "${AUTHOR_EMAIL}"
-    VERSION           = "$(VERSION)"
-  }
   secret = [
     "type=env,id=NEXT_PUBLIC_ALGOLIA_APIKEY",
     "type=env,id=NEXT_PUBLIC_ALGOLIA_APPID",
@@ -37,9 +25,4 @@ target "blog" {
     "type=env,id=NEXT_PUBLIC_GISCUS_REPO",
     "type=env,id=NEXT_PUBLIC_GISCUS_REPOSITORY_ID",
   ]
-  tags = [
-    notequal("", VERSION) ? "${REPO}/blog:${VERSION}" : "",
-    "${REPO}/blog:latest",
-  ]
-  platforms = ["linux/amd64", "linux/arm64"]
 }

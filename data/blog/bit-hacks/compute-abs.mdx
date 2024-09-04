@@ -17,7 +17,7 @@ authors: ['default']
 
 ```cpp:abs.cc
 template <typename T, class = typename std::enable_if_t<!std::is_unsigned_v<T>>>
-inline typename std::make_unsigned_t<T> mabs(T _val) { 
+inline typename std::make_unsigned_t<T> mabs(T _val) {
     const T mask = _val >> (sizeof(T) * 8 - 1);
     return (_val ^ mask) - mask;
 }

@@ -99,16 +99,16 @@ authors: ['default']
 (1) ADD rd, rs, rt
 
 | 0000 | rd(四位) | rs(四位) | rt(四位) |
-|:----:|:------:|:------:|:------:|
-|      |        |        |        |
+| :--: | :------: | :------: | :------: |
+|      |          |          |          |
 
 > 功能: rd \<- rs + rt (算数加)
 
 (2) INC rt, rs
 
 | 0001 | rt(四位) | rs(四位) | 0000(未用) |
-|:----:|:------:|:------:|:--------:|
-|      |        |        |          |
+| :--: | :------: | :------: | :--------: |
+|      |          |          |            |
 
 > 功能: rt \<- rs (算数加1)
 
@@ -117,24 +117,24 @@ authors: ['default']
 (3) NOT rt, rs
 
 | 0010 | rt(四位) | rs(四位) | 0000(未用) |
-|:----:|:------:|:------:|:--------:|
-|      |        |        |          |
+| :--: | :------: | :------: | :--------: |
+|      |          |          |            |
 
 > 功能: rt \<- !rs (逻辑非运算)
 
 (4) AND rd, rs, rt
 
 | 0011 | rd(四位) | rs(四位) | rt(四位) |
-|:----:|:------:|:------:|:------:|
-|      |        |        |        |
+| :--: | :------: | :------: | :------: |
+|      |          |          |          |
 
-> 功能: rd \<-  rs & rt (逻辑与运算)
+> 功能: rd \<- rs & rt (逻辑与运算)
 
 (5) OR rd, rs, rt
 
 | 0100 | rd(四位) | rs(四位) | rt(四位) |
-|:----:|:------:|:------:|:------:|
-|      |        |        |        |
+| :--: | :------: | :------: | :------: |
+|      |          |          |          |
 
 > 功能: rd \<- rs \| rt (逻辑或运算)
 
@@ -143,16 +143,16 @@ authors: ['default']
 (6) SLF rd, rs, rt
 
 | 0101 | rd(四位) | rs(四位) | rt(四位) |
-|:----:|:------:|:------:|:------:|
-|      |        |        |        |
+| :--: | :------: | :------: | :------: |
+|      |          |          |          |
 
 > 功能: rd \<- rs\<\<rt (左移)
 
 (7) SRF rd, rt, rs
 
 | 0110 | rd(四位) | rs(四位) | rt(四位) |
-|:----:|:------:|:------:|:------:|
-|      |        |        |        |
+| :--: | :------: | :------: | :------: |
+|      |          |          |          |
 
 > 功能: rd \<- rs\>\>rt (右移)
 
@@ -161,16 +161,16 @@ authors: ['default']
 (8) STO rt, rs
 
 | 1000 | rt(三位) | 0(未用) | rs(四位) | 0000(未用) |
-|:----:|:------:|:-----:|:------:|:--------:|
-|      |        |       |        |          |
+| :--: | :------: | :-----: | :------: | :--------: |
+|      |          |         |          |            |
 
 > 功能: 将数据从寄存器写入到数据存储器
 
 (9) LAD rt, rs
 
 | 1001 | rt(四位) | rs(三位) | 00000(未用) |
-|:----:|:------:|:------:|:---------:|
-|      |        |        |           |
+| :--: | :------: | :------: | :---------: |
+|      |          |          |             |
 
 > 功能: 将数据从数据存储器读出到寄存器
 
@@ -179,8 +179,8 @@ authors: ['default']
 (10) JMP
 
 | 0111 | 0000(未用) | 转移指令地址(八位) |
-|:----:|:--------:|:----------:|
-|      |          |            |
+| :--: | :--------: | :----------------: |
+|      |            |                    |
 
 > 功能: 跳转到指定的指令地址
 
@@ -189,8 +189,8 @@ authors: ['default']
 (11) HLT
 
 | 1111 | 000000000000(未用) |
-|:----:|:----------------:|
-|      |                  |
+| :--: | :----------------: |
+|      |                    |
 
 > 功能: 停机, PC的值保持不变
 
@@ -235,7 +235,7 @@ module alu(op, a, b, n, f);
     input [7:0] a, b;
     output [7:0] f;
     reg [7:0] f;
-    
+
     always@(*)
     begin
         case(op)
@@ -249,7 +249,7 @@ module alu(op, a, b, n, f);
             default:    f = 8'b00000000;
         endcase
     end
-    
+
 endmodule
 ```
 
@@ -261,40 +261,40 @@ endmodule
 
 //存储器
 module memRam(data,wren,address,inclock,outclock,q);
-    
+
     parameter wordsize = 8;
     parameter memsize = 8;
     parameter addr = 3; //3位地址线
-    
+
     input [wordsize-1:0] data;
     input [addr-1:0] address;
     input wren,inclock,outclock;
     output [wordsize-1:0] q;
     reg [wordsize-1:0] q;
     reg [wordsize-1:0] ram [memsize-1:0];
-    
+
     integer i;
-    
-    initial 
+
+    initial
         begin//初始化
             for(i=0; i<8; i=i+1)
                 ram[i]=8'b00000000;
             ram[0]=8'b00000010; //在第0位写入2
-            
+
         end
-    
+
     always@(posedge inclock)    //inclock上升沿触发
         begin
             if(~wren)
                 ram[address] = data;    //wren为低电平时, 将data写入到对应地址
         end
-    
+
     always@(posedge outclock)   //outclock上升沿触发
         begin
             if(wren)
                 q = ram[address];   //wren为高电平时, 读出对应地址的数据
         end
-        
+
 endmodule
 ```
 
@@ -308,39 +308,39 @@ endmodule
 module Register(clk,data,wren,inaddr,outaddr1,outaddr2,
                     regtoalu1,regtoalu2,regtomemaddr,regtomem,
                     memtoregwren,memtoregaddr,memtoregdata);
-    
+
     input [7:0] data;
     input [3:0] inaddr,outaddr1,outaddr2,regtomemaddr,memtoregaddr;
     input wren,clk,memtoregwren;
     output [7:0] regtoalu1,regtoalu2,regtomem,memtoregdata;
-    
+
     reg [7:0] regmem [15:0];
-    
+
     reg lwren,lmemtoregwren;
     reg [3:0] linaddr,lmemtoregaddr;
     reg [7:0] ldata,lmemtoregdata;
-    
+
     integer i;
-    
-    initial 
+
+    initial
         begin//初始化
             lwren = 1'b0;
             lmemtoregwren = 1'b0;
             for(i=0; i<16; i=i+1)
                 regmem[i]=8'b00000000;
         end
-        
+
     always@(posedge clk)    //缓存
         begin
             lwren <= wren;
             linaddr <= inaddr;
             ldata <= data;
-            
+
             lmemtoregwren <= memtoregwren;
             lmemtoregaddr <= memtoregaddr;
             lmemtoregdata <= memtoregdata;
         end
-    
+
     always@(*)
         begin
             if(lwren)
@@ -348,11 +348,11 @@ module Register(clk,data,wren,inaddr,outaddr1,outaddr2,
             if(lmemtoregwren)
                 regmem[lmemtoregaddr] <= lmemtoregdata;
         end
-        
+
     assign regtoalu1 = regmem[outaddr1];    //从寄存器取值
     assign regtoalu2 = regmem[outaddr2];
     assign regtomem = regmem[regtomemaddr];
-        
+
 endmodule
 ```
 
@@ -367,10 +367,10 @@ module InstructionMemory(A, RD);
 
     input [7:0] A;
     output [15:0] RD;
-    
+
     reg [15:0] IM [29:0];
     assign RD = IM[A];//立即根据地址取出内容
-    
+
     //执行成功后, 存储器中从1到7位的数据应为: 2, 3, 5, 2, 3, 253, 250, 126
     initial begin
         IM[0] = {`LAD, `rg0, 3'b000, 5'b00000};     //从存储器第0位读取数据到寄存器rg0, rg0 = 2
@@ -451,7 +451,7 @@ module CU(
     output reg pcnext,
     output reg pcflag,
     output reg regwren);
-    
+
 wire [3:0] op;
 assign op = instr[15:12];
 
@@ -509,7 +509,7 @@ always@(*)
                 //memwren <= 1'b1;
             end
     end
-    
+
 always@(*)
     begin
         if((op == `JMP))
@@ -522,7 +522,7 @@ always@(*)
             pcnext <= 1'b0;
     end
 
-    
+
     assign enable = ~(op == `HAT);
 endmodule
 ```
@@ -538,7 +538,7 @@ module CPU_top(
     input reset,
     output [7:0] OPT_PC
     );
-    
+
     reg [7:0] PC;
     wire [15:0] instr;
     wire [7:0] aluout;
@@ -557,16 +557,16 @@ module CPU_top(
     wire [7:0] regtomem;
     wire [7:0] NextPC;
     wire [7:0] pcnextaddr;
-    
+
     initial begin
         PC = 8'b00000000;
     end
-    
+
     InstructionMemory IM(
         .A(PC),
         .RD(instr)
     );
-    
+
     CU m0(
         .instr(instr),
         .enable(enable),
@@ -585,7 +585,7 @@ module CPU_top(
         .pcflag(pcflag),
         .regwren(regwren)
    );
-    
+
     Register R(
         .clk(clk),
         .data(aluout),
@@ -601,8 +601,8 @@ module CPU_top(
         .memtoregaddr(memtoregaddr),
         .memtoregdata(memtoregdata)
    );
-    
-    
+
+
     alu A(
         .op(aluop),
         .a(Registerout1),
@@ -610,7 +610,7 @@ module CPU_top(
         .n(alun),
         .f(aluout)
    );
-    
+
     memRam M(
         .data(regtomem),
         .wren(memwren),
@@ -619,10 +619,10 @@ module CPU_top(
         .outclock(clk),
         .q(memtoregdata)
    );
-    
-    
+
+
     assign NextPC = (pcnext) ? pcnextaddr : (PC + 1'b1);    //判定是跳转到指定地址还是执行下一条指令
-    
+
     always@(posedge clk)    //时序，每个周期PC值变化一次
     begin
         if(reset)
@@ -637,7 +637,7 @@ module CPU_top(
     end
 
     assign OPT_PC = PC;
-    
+
 endmodule
 ```
 
@@ -649,39 +649,39 @@ endmodule
 `timescale 1ns / 1ps
 
 module CPU_test(OPT_PC);
-    
+
     output [7:0] OPT_PC;
     reg clk;
     reg reset;
-    
-    
+
+
     CPU_top uut(
         .clk(clk),
         .reset(reset),
         .OPT_PC(OPT_PC)
     );
-    
-    
+
+
     //执行成功后，存储器中从1到7位的数据应为: 2，3，5，2，3，253，250，126
     initial begin
         clk = 0;
         reset = 1;  //初始化CPU
-        
+
         #100;
-        
+
         reset = 0;
-        
+
         $display(" pc:     instr      :  ALUR  :rg0:rg1:rg2: m0: m1: m2: m3: m4: m5: m6: m7");
-        $monitor("%d:%b:%b:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d", 
-            uut.PC, uut.instr, uut.aluout, uut.R.regmem[0], uut.R.regmem[1], uut.R.regmem[2], 
-            uut.M.ram[0], uut.M.ram[1], uut.M.ram[2], uut.M.ram[3], 
+        $monitor("%d:%b:%b:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d",
+            uut.PC, uut.instr, uut.aluout, uut.R.regmem[0], uut.R.regmem[1], uut.R.regmem[2],
+            uut.M.ram[0], uut.M.ram[1], uut.M.ram[2], uut.M.ram[3],
             uut.M.ram[4], uut.M.ram[5], uut.M.ram[6], uut.M.ram[7] );
-      
+
         #2000 $stop;
     end
-    
+
     always #50 clk = ~clk;
-      
+
 endmodule
 ```
 

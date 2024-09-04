@@ -17,7 +17,6 @@ Clion 中演示的效果
 
 ![终端中运行效果图](/static/images/other/cpp-calls-ffmpeg-for-rtmp-push/console.webp)
 
-
 ## 思路 💡
 
 通过 fork 一个子进程来调用 ffmpeg 进行推流, 视频帧通过 opencv 来获取, 通过管道传输到子进程, 实现推流
@@ -121,4 +120,3 @@ file(GLOB ProjectSRC
 add_executable(${PROJECT_NAME} ${ProjectSRC})
 target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS})
 ```
-

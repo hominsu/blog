@@ -38,7 +38,7 @@ authors: ['default']
   ```bash
   [root@localhost ~]# ls
   anaconda-ks.cfg  tc.tgz
-  [root@localhost ~]# tar -xzf tc.tgz 
+  [root@localhost ~]# tar -xzf tc.tgz
   [root@localhost ~]# ls
   anaconda-ks.cfg  tc  tc.tgz
   [root@localhost ~]# cd tc
@@ -95,7 +95,7 @@ authors: ['default']
   Can't read private key
   -- Installing: /usr/local/bin/tpmd
   -- Removed runtime path from "/usr/local/bin/tpmd"
-  
+
   [root@localhost build]# modprobe tpmd_dev
   ```
 
@@ -117,14 +117,12 @@ authors: ['default']
   tpm_startup.c:43: Info: TPM_Startup(1)
   ```
 
-  
-
 ## 编译 trousers
 
 - 新建一个终端，进入 trousers 目录，通过 `bootstrap` 生成 `configure`
 
   ```bash
-  [root@localhost trousers-0.3.15]# sh bootstrap.sh 
+  [root@localhost trousers-0.3.15]# sh bootstrap.sh
   + aclocal
   + libtoolize --force -c
   libtoolize: putting auxiliary files in `.'.
@@ -188,8 +186,6 @@ authors: ['default']
   tpm_cmd_handler.c:4084: Info: TPM command succeeded
   ```
 
-  
-
 ## 验证安装环境
 
 - 新开一个终端，进入 trusted-computing-projectv0.3 目录中，make clean 清除之前的构建，然后编译。有警告是正常的，不是错误就行。
@@ -206,7 +202,7 @@ authors: ['default']
   [root@localhost init]# ls
   create_mig_key  create_mig_key.c  Makefile  Tspi_TPM_TakeOwnership01  Tspi_TPM_TakeOwnership01.c
   [root@localhost init]# ./Tspi_TPM_TakeOwnership01 -v 1.2
-  
+
   <<<test_start>>>
   Testing Tspi_TPM_TakeOwnership01
   TESTSUITE_OWNER_SECRET:(null)
@@ -256,7 +252,7 @@ authors: ['default']
   00000110|  d4 b0 30 7d 03 b0 b4 0a  09 12 18 ad 10 73 bd 83  ..0}.........s..
   00000120|  9f 2d 5e 46 57 37 1c 00  29 16 4b 44 68 e4 f2 95  .-^FW7..).KDh...
   00000130|  9b 53 fe 0b 32 f1 48 78                           .S..2.Hx
-  
+
   Success
   [root@localhost SealUnseal]# ./unseal -v 1.2
   Sealed data:
@@ -283,11 +279,9 @@ authors: ['default']
   Unsealed Data:
   00000000|  30 31 32 33 34 35 36 37  38 39 41 42 43 44 45 46  0123456789ABCDEF
   00000010|  30 31 32 33 34 35 36 37  38 39 41 42 43 44 45 46  0123456789ABCDEF
-  
+
   Success
   ```
-
-  
 
 ## 其他
 
