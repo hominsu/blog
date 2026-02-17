@@ -13,6 +13,12 @@ jobs:
       packages: write
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -46,7 +52,7 @@ jobs:
         uses: docker/bake-action@v5
         with:
           files: |
-            docker-bake.hcl
+            deploy/docker-bake.hcl
             ${{ steps.meta.outputs.bake-file }}
           targets: blog
           push: true
