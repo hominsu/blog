@@ -1,4 +1,4 @@
-FROM node:20-alpine AS base
+FROM node:lts-alpine AS base
 
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
@@ -24,7 +24,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NEXT_TELEMETRY_DISABLED=1
 RUN --mount=type=secret,id=NEXT_PUBLIC_ALGOLIA_APIKEY \
     --mount=type=secret,id=NEXT_PUBLIC_ALGOLIA_APPID \
     --mount=type=secret,id=NEXT_PUBLIC_ALGOLIA_INDEX_NAME \
